@@ -56,6 +56,15 @@ function IconChevronRight() {
   );
 }
 
+function IconSettings() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <circle cx="9" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // ── Nav items config ───────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
@@ -66,7 +75,7 @@ const NAV_ITEMS = [
 
 // ── Sidebar component ──────────────────────────────────────────────────────
 
-export default function Sidebar({ nav, onNavigate }) {
+export default function Sidebar({ nav, onNavigate, onSettings }) {
   const [collapsed, setCollapsed] = useState(false);
 
   const W_EXPANDED  = 220;
@@ -132,15 +141,15 @@ export default function Sidebar({ nav, onNavigate }) {
             <span
               style={{
                 fontFamily: "var(--font-display)",
-                fontSize: 19,
+                fontSize: 14,
                 fontWeight: 700,
                 color: "#FFFFFF",
-                letterSpacing: "-.3px",
+                letterSpacing: "-.2px",
                 lineHeight: 1,
                 display: "block",
               }}
             >
-              Lexic
+              O.D. Mikulić Nikolić
             </span>
             <span
               style={{
@@ -153,7 +162,7 @@ export default function Sidebar({ nav, onNavigate }) {
                 marginTop: 3,
               }}
             >
-              Legal Suite
+              Odvjetničko društvo
             </span>
           </div>
         </div>
@@ -298,37 +307,94 @@ export default function Sidebar({ nav, onNavigate }) {
       {/* ── Footer ──────────────────────────────── */}
       <div
         style={{
-          padding: collapsed ? "16px 0" : "16px 20px",
           borderTop: "1px solid rgba(255,255,255,.06)",
           overflow: "hidden",
-          transition: "padding 0.25s cubic-bezier(0.4,0,0.2,1)",
         }}
       >
-        <div
+        {/* Settings button */}
+        <button
+          onClick={onSettings}
+          title={collapsed ? "Settings" : undefined}
           style={{
-            overflow: "hidden",
-            maxWidth: collapsed ? 0 : 200,
-            opacity: collapsed ? 0 : 1,
-            transition: "max-width 0.22s cubic-bezier(0.4,0,0.2,1), opacity 0.12s ease",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: collapsed ? "center" : "flex-start",
+            gap: collapsed ? 0 : 10,
+            width: "100%",
+            padding: collapsed ? "13px 0" : "12px 20px",
+            background: nav === "settings" ? "var(--sidebar-active)" : "none",
+            border: "none",
+            borderLeft: `2px solid ${nav === "settings" ? "var(--gold-light)" : "transparent"}`,
+            cursor: "pointer",
+            color: nav === "settings" ? "#FFFFFF" : "rgba(255,255,255,.48)",
+            fontFamily: "var(--font-body)",
+            fontSize: 13.5,
+            fontWeight: nav === "settings" ? 500 : 400,
+            textAlign: "left",
+            transition: "all .15s",
             whiteSpace: "nowrap",
+          }}
+          onMouseEnter={(e) => {
+            if (nav !== "settings") {
+              e.currentTarget.style.background = "var(--sidebar-hover)";
+              e.currentTarget.style.color = "rgba(255,255,255,.82)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (nav !== "settings") {
+              e.currentTarget.style.background = "none";
+              e.currentTarget.style.color = "rgba(255,255,255,.48)";
+            }
           }}
         >
           <span
             style={{
-              fontSize: 10,
-              fontWeight: 500,
-              color: "rgba(255,255,255,.18)",
-              letterSpacing: ".3px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 20,
+              flexShrink: 0,
+              color: nav === "settings" ? "var(--gold-light)" : "currentColor",
+              transition: "color .15s",
             }}
           >
-            LexSuite MVP v0.1
+            <IconSettings />
           </span>
-        </div>
-        {collapsed && (
-          <div style={{ display: "flex", justifyContent: "center" }}>
-            <LexicLogo size={20} scaleColor="rgba(196,154,42,0.4)" pillarColor="rgba(255,255,255,0.15)" />
+          <span
+            style={{
+              overflow: "hidden",
+              maxWidth: collapsed ? 0 : 160,
+              opacity: collapsed ? 0 : 1,
+              transition: "max-width 0.22s cubic-bezier(0.4,0,0.2,1), opacity 0.12s ease",
+              whiteSpace: "nowrap",
+              display: "block",
+            }}
+          >
+            Settings
+          </span>
+        </button>
+
+        {/* Version / logo */}
+        <div style={{ padding: collapsed ? "10px 0" : "10px 20px", transition: "padding 0.25s cubic-bezier(0.4,0,0.2,1)" }}>
+          <div
+            style={{
+              overflow: "hidden",
+              maxWidth: collapsed ? 0 : 200,
+              opacity: collapsed ? 0 : 1,
+              transition: "max-width 0.22s cubic-bezier(0.4,0,0.2,1), opacity 0.12s ease",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <span style={{ fontSize: 10, fontWeight: 500, color: "rgba(255,255,255,.18)", letterSpacing: ".3px" }}>
+              LexSuite MVP v0.1
+            </span>
           </div>
-        )}
+          {collapsed && (
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <LexicLogo size={20} scaleColor="rgba(196,154,42,0.4)" pillarColor="rgba(255,255,255,0.15)" />
+            </div>
+          )}
+        </div>
       </div>
     </aside>
   );

@@ -5,6 +5,7 @@ import SviPredmetiPage from "./pages/SviPredmetiPage";
 import RokovnikPage from "./pages/RokovnikPage";
 import KlijentiPage from "./pages/KlijentiPage";
 import KlijentPage from "./pages/KlijentPage";
+import SettingsPage from "./pages/SettingsPage";
 
 function IconSun() {
   return (
@@ -67,6 +68,8 @@ export default function App() {
     setNav("predmet");
   };
 
+  const handleSettings = () => setNav("settings");
+
   const navigate = (id) => {
     if (id === "klijenti") { handleBackFromKlijent(); }
     else { setNav(id); }
@@ -74,12 +77,34 @@ export default function App() {
 
   return (
     <div className="layout">
-      <Sidebar nav={nav} onNavigate={navigate} />
+      <Sidebar nav={nav} onNavigate={navigate} onSettings={handleSettings} />
 
       <main className="main">
-        <button className="dark-toggle" onClick={() => setDark(!dark)} title={dark ? "Switch to light mode" : "Switch to dark mode"}>
-          {dark ? <IconSun /> : <IconMoon />}
-        </button>
+        <div style={{ position: "absolute", top: 16, right: 20, display: "flex", alignItems: "center", gap: 10, zIndex: 100 }}>
+          <button className="dark-toggle" onClick={() => setDark(!dark)} title={dark ? "Switch to light mode" : "Switch to dark mode"} style={{ position: "static" }}>
+            {dark ? <IconSun /> : <IconMoon />}
+          </button>
+          <div
+            title="O.D. Mikulić Nikolić"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              background: "var(--ink)",
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: ".5px",
+              flexShrink: 0,
+              userSelect: "none",
+            }}
+          >
+            MN
+          </div>
+        </div>
 
         {nav === "predmet" && selectedId
           ? <PredmetPage predmetId={selectedId} onBack={handleBackFromPredmet} onSelectKlijent={handleSelectKlijent} />
@@ -95,6 +120,8 @@ export default function App() {
           ? <RokovnikPage onSelectPredmet={handleSelectPredmet} />
           : nav === "svi_predmeti"
           ? <SviPredmetiPage onSelectPredmet={handleSelectPredmet} onSelectKlijent={handleSelectKlijent} />
+          : nav === "settings"
+          ? <SettingsPage />
           : <KlijentiPage onSelect={handleSelectKlijent} onSelectPredmet={handleSelectPredmet} />
         }
       </main>
