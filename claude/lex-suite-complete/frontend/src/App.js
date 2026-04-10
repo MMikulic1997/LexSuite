@@ -90,7 +90,7 @@ export default function App() {
               title="O.D. Mikulić Nikolić"
               style={{
                 width: 32, height: 32, borderRadius: "50%",
-                background: "var(--ink)", color: "#fff",
+                background: "#1C1C1E", color: "#fff",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 12, fontWeight: 700, letterSpacing: ".5px",
                 flexShrink: 0, userSelect: "none",
