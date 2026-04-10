@@ -90,9 +90,43 @@ body {
 .main {
   flex: 1 1 0;
   min-width: 0;
-  padding: 44px 52px;
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   position: relative;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 52px;
+  height: 56px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.topbar-firm {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+  letter-spacing: -.1px;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-content {
+  padding: 44px 52px;
+  flex: 1;
 }
 
 /* ── Cards ───────────────────────────────── */
@@ -371,12 +405,10 @@ select { cursor: pointer; }
 
 /* ── Dark mode toggle button ─────────────── */
 .dark-toggle {
-  position: absolute; top: 16px; right: 24px;
   width: 36px; height: 36px; border-radius: 50%;
   background: var(--surface-2); border: 1px solid var(--border);
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; color: var(--ink-3); transition: all .15s;
-  z-index: 5;
 }
 .dark-toggle:hover { background: var(--surface-3); color: var(--ink); border-color: var(--border-2); }
 

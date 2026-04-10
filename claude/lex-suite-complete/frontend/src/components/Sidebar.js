@@ -68,9 +68,9 @@ function IconSettings() {
 // ── Nav items config ───────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
-  { id: "svi_predmeti", label: "Cases",    icon: <IconCases />,    activeIds: ["svi_predmeti", "predmet"] },
-  { id: "rokovnik",     label: "Calendar", icon: <IconCalendar />, activeIds: ["rokovnik"] },
-  { id: "klijenti",     label: "Clients",  icon: <IconClients />,  activeIds: ["klijenti", "klijent"] },
+  { id: "svi_predmeti", label: "Predmeti", icon: <IconCases />,    activeIds: ["svi_predmeti", "predmet"] },
+  { id: "rokovnik",     label: "Rokovnik", icon: <IconCalendar />, activeIds: ["rokovnik"] },
+  { id: "klijenti",     label: "Klijenti", icon: <IconClients />,  activeIds: ["klijenti", "klijent"] },
 ];
 
 // ── Sidebar component ──────────────────────────────────────────────────────
@@ -141,15 +141,15 @@ export default function Sidebar({ nav, onNavigate, onSettings }) {
             <span
               style={{
                 fontFamily: "var(--font-display)",
-                fontSize: 14,
+                fontSize: 19,
                 fontWeight: 700,
                 color: "#FFFFFF",
-                letterSpacing: "-.2px",
+                letterSpacing: "-.3px",
                 lineHeight: 1,
                 display: "block",
               }}
             >
-              O.D. Mikulić Nikolić
+              Lexic
             </span>
             <span
               style={{
@@ -162,7 +162,7 @@ export default function Sidebar({ nav, onNavigate, onSettings }) {
                 marginTop: 3,
               }}
             >
-              Odvjetničko društvo
+              Legal Suite
             </span>
           </div>
         </div>
@@ -314,7 +314,7 @@ export default function Sidebar({ nav, onNavigate, onSettings }) {
         {/* Settings button */}
         <button
           onClick={onSettings}
-          title={collapsed ? "Settings" : undefined}
+          title={collapsed ? "Postavke" : undefined}
           style={{
             display: "flex",
             alignItems: "center",
@@ -370,7 +370,7 @@ export default function Sidebar({ nav, onNavigate, onSettings }) {
               display: "block",
             }}
           >
-            Settings
+            Postavke
           </span>
         </button>
 
