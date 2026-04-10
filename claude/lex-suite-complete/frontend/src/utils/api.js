@@ -51,6 +51,15 @@ export const api = {
 
   getFajlUrl: (predmetId, dokId) => `${BASE}/predmeti/${predmetId}/dokumenti/${dokId}/fajl`,
 
+  // Zadaci
+  createZadatak:  (predmetId, data)           => req("POST",   `/predmeti/${predmetId}/zadaci`, data),
+  updateZadatak:  (predmetId, zadatakId, data) => req("PATCH",  `/predmeti/${predmetId}/zadaci/${zadatakId}`, data),
+  deleteZadatak:  (predmetId, zadatakId)       => req("DELETE", `/predmeti/${predmetId}/zadaci/${zadatakId}`),
+
+  // Troškovnik
+  createStavka:   (predmetId, data)       => req("POST",   `/predmeti/${predmetId}/troskovnik`, data),
+  deleteStavka:   (predmetId, stavkaId)   => req("DELETE", `/predmeti/${predmetId}/troskovnik/${stavkaId}`),
+
   // Klijenti
   getKlijenti:          ()     => req("GET",    "/klijenti"),
   getKlijentiPregled:   ()     => req("GET",    "/klijenti/pregled"),

@@ -1,193 +1,73 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { api } from "../utils/api";
 
-const GRUPE = [
-  {
-    naziv: "Sporni",
-    vrste: [
-      { kod: "PP",     naziv: "Parnica" },
-      { kod: "KP",     naziv: "Kazneni" },
-      { kod: "UP",     naziv: "Upravni spor" },
-      { kod: "OS",     naziv: "Obiteljski spor" },
-      { kod: "SP-OST", naziv: "Ostalo sporni" },
-    ],
-  },
-  {
-    naziv: "Nesporni",
-    vrste: [
-      { kod: "NS-OSN", naziv: "Osnivanje" },
-      { kod: "NS-ZK",  naziv: "Zemljišnoknjižni upis" },
-      { kod: "NS-OST", naziv: "Ostalo nesporni" },
-    ],
-  },
-  {
-    naziv: "Savjetodavni",
-    vrste: [
-      { kod: "SAV-UG",  naziv: "Izrada ugovora" },
-      { kod: "SAV-MI",  naziv: "Pravno mišljenje" },
-      { kod: "SAV-KON", naziv: "Konzultacije" },
-      { kod: "SAV-OST", naziv: "Ostalo savjetodavni" },
-    ],
-  },
-];
-
-const SPORNI_VRSTE   = ["PP","KP","UP","OS","SP-OST"];
-const NESPORNI_VRSTE = ["NS-OSN","NS-ZK","NS-OST"];
-const getGrupa = (vrsta) => {
-  if (SPORNI_VRSTE.includes(vrsta))   return "sporni";
-  if (NESPORNI_VRSTE.includes(vrsta)) return "nesporni";
-  return "savjetodavni";
-};
-
-const LBL = { // label style shorthand
-  fontSize: 11, textTransform: "uppercase", letterSpacing: ".5px",
-  color: "var(--ink-3)", marginBottom: 2,
-};
+const ULOGE_SPORNI   = ["Tužitelj", "Tuženik", "Umješač", "Ovršenik", "Ovrhovoditelj", "Ostalo"];
+const ULOGE_NESPORNI = ["Naručitelj", "Zastupani", "Ostalo"];
 
 export default function NovPredmetModal({ onSave, onClose, initialData }) {
-  // ── Klijent search ──────────────────────────────────────────────────────────
-  const [klijenti, setKlijenti]             = useState([]);
-  const [klijentSearch, setKlijentSearch]   = useState("");
-  const [selectedKlijent, setSelectedKlijent] = useState(initialData?.klijent || null);
-  const [showDropdown, setShowDropdown]     = useState(false);
-  const searchRef = useRef(null);
+  const klijentLocked = !!initialData?.klijent;
 
-  useEffect(() => { api.getKlijenti().then(setKlijenti); }, []);
-
-  const filteredKlijenti = klijentSearch.trim()
-    ? klijenti
-        .filter((k) =>
-          k.naziv.toLowerCase().includes(klijentSearch.toLowerCase()) ||
-          k.oib.includes(klijentSearch)
-        )
-        .slice(0, 6)
-    : [];
-
-  const handleSelectKlijent = (k) => {
-    setSelectedKlijent(k);
-    setKlijentSearch("");
-    setShowDropdown(false);
-    set("tuziteljIme", k.naziv);
-    set("tuziteljOib", k.oib);
-  };
-
-  const handleClearKlijent = () => {
-    setSelectedKlijent(null);
-    setKlijentSearch("");
-    set("tuziteljIme", "");
-    set("tuziteljOib", "");
-    setTimeout(() => searchRef.current?.focus(), 50);
-  };
-
-  // ── Case form ───────────────────────────────────────────────────────────────
   const [form, setForm] = useState({
-    vrsta:        "KP",
-    tuziteljIme:  initialData?.klijent?.naziv || "",
-    tuziteljOib:  initialData?.klijent?.oib  || "",
-    tuzeniIme:    "",
-    tuzeniOib:    "",
-    poslovniBroj: "",
-    vps:          "",
-    sud:          "",
-    sudac:        "",
-    opis:         "",
+    vrsta:            "SPORNI",
+    nazivPredmeta:    "",
+    oznakaPrefix:     "",
+    rucnaOznaka:      false,
+    oznaka:           "",
+    // stranka (oba tipa)
+    strankaIme:       initialData?.klijent?.naziv || "",
+    strankaOib:       initialData?.klijent?.oib   || "",
+    strankaUloga:     "Tužitelj",   // SPORNI: uloga iz ULOGE_SPORNI
+    ulogaKlijenta:    "Naručitelj", // NESPORNI: uloga iz ULOGE_NESPORNI
+    stranaUmjesaca:   "tuzitelj",   // vidljivo samo kad je strankaUloga = "Umješač"
+    // protustranka (samo SPORNI, neobavezno)
+    protustrankaIme:  "",
+    protustrankaOib:  "",
+    // sud, sudac, pbs, vps (samo SPORNI)
+    sud:              "",
+    sudac:            "",
+    poslovniBroj:     "",
+    vps:              "",
+    // opis
+    opis:             "",
   });
-  const [rucnaOznaka, setRucnaOznaka] = useState(false);
-  const [oznaka, setOznaka]           = useState("");
-  const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState("");
 
-  const set  = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const grupa = getGrupa(form.vrsta);
-  const isSporni      = grupa === "sporni";
-  const isNesporni    = grupa === "nesporni";
-  const isSavjetodavni = grupa === "savjetodavni";
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const isSporni = form.vrsta === "SPORNI";
+
+  const godina = String(new Date().getFullYear()).slice(-2);
+  const previewOznaka = form.rucnaOznaka
+    ? (form.oznaka || "…")
+    : `${form.oznakaPrefix || ""}XXXX/${godina}`;
 
   const submit = async () => {
-    if (isSporni && (!form.tuziteljIme.trim() || !form.tuzeniIme.trim())) {
-      setError("Tužitelj i tuženi su obavezni."); return;
-    }
-    if (!isSporni && !form.tuziteljIme.trim()) {
-      setError("Klijent je obavezan."); return;
-    }
-    if (rucnaOznaka && !oznaka.trim()) {
-      setError("Unesite oznaku predmeta."); return;
-    }
+    if (!form.nazivPredmeta.trim())              { setError("Naziv predmeta je obavezan."); return; }
+    if (!form.strankaIme.trim())                 { setError(isSporni ? "Ime stranke je obavezno." : "Ime klijenta je obavezno."); return; }
+    if (form.rucnaOznaka && !form.oznaka.trim()) { setError("Unesite oznaku predmeta."); return; }
     setLoading(true); setError("");
     try {
       await onSave({
-        vrsta: form.vrsta,
-        ...(rucnaOznaka && { oznaka: oznaka.trim() }),
-        tuzitelj:     { ime: form.tuziteljIme.trim(), oib: form.tuziteljOib.trim() },
-        tuzeni:       { ime: form.tuzeniIme.trim(),   oib: form.tuzeniOib.trim()   },
-        ...(isSporni && { poslovniBroj: form.poslovniBroj, vps: form.vps, sud: form.sud, sudac: form.sudac }),
-        ...(isNesporni && { sud: form.sud }),
-        opis:    form.opis,
-        ...(selectedKlijent && { klijentId: selectedKlijent.id }),
+        vrsta:         form.vrsta,
+        nazivPredmeta: form.nazivPredmeta.trim(),
+        ...(form.rucnaOznaka
+          ? { oznaka: form.oznaka.trim() }
+          : { oznakaPrefix: form.oznakaPrefix.trim() }),
+        stranka:      { ime: form.strankaIme.trim(), oib: form.strankaOib.trim(), uloga: isSporni ? form.strankaUloga : undefined },
+        protustranka: isSporni ? { ime: form.protustrankaIme.trim(), oib: form.protustrankaOib.trim() } : undefined,
+        ulogaKlijenta:  isSporni ? form.strankaUloga : form.ulogaKlijenta,
+        stranaUmjesaca: isSporni && form.strankaUloga === "Umješač" ? form.stranaUmjesaca : undefined,
+        poslovniBroj:  form.poslovniBroj,
+        ...(isSporni && { sud: form.sud, sudac: form.sudac, vps: form.vps }),
+        opis:          form.opis,
+        ...(initialData?.klijent && { klijentId: initialData.klijent.id }),
       });
       onClose();
     } catch (e) {
-      setError(e.message); setLoading(false);
+      setError(e.message);
+      setLoading(false);
     }
   };
-
-  // ── Klijent search UI (shared for all types) ─────────────────────────────
-  const klijentSearchUI = (
-    <div className="form-group full">
-      <label>{isSporni ? "Klijent ureda (za vezanje evidencije)" : "Klijent *"}</label>
-      {selectedKlijent ? (
-        <div style={{
-          display: "flex", alignItems: "center", gap: 10,
-          padding: "8px 12px", background: "var(--parchment)",
-          border: "1px solid var(--cream)", borderRadius: 6,
-        }}>
-          <span style={{ fontSize: 13, fontWeight: 500, flex: 1 }}>👤 {selectedKlijent.naziv}</span>
-          {selectedKlijent.oib && (
-            <span style={{ fontSize: 12, color: "var(--ink-3)", fontFamily: "monospace" }}>{selectedKlijent.oib}</span>
-          )}
-          <button
-            onClick={handleClearKlijent}
-            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "var(--ink-3)", lineHeight: 1, padding: "0 2px" }}
-            title="Ukloni klijenta"
-          >×</button>
-        </div>
-      ) : (
-        <div style={{ position: "relative" }}>
-          <input
-            ref={searchRef}
-            placeholder="Pretraži po imenu ili OIB-u..."
-            value={klijentSearch}
-            onChange={(e) => { setKlijentSearch(e.target.value); setShowDropdown(true); }}
-            onFocus={() => klijentSearch && setShowDropdown(true)}
-            onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-          />
-          {showDropdown && filteredKlijenti.length > 0 && (
-            <div style={{
-              position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100,
-              background: "#fff", border: "1px solid var(--cream)", borderRadius: 6,
-              boxShadow: "0 4px 16px rgba(0,0,0,.1)", overflow: "hidden", marginTop: 2,
-            }}>
-              {filteredKlijenti.map((k) => (
-                <div
-                  key={k.id}
-                  onMouseDown={() => handleSelectKlijent(k)}
-                  style={{ padding: "10px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = "var(--parchment)"}
-                  onMouseLeave={(e) => e.currentTarget.style.background = ""}
-                >
-                  <span style={{ fontWeight: 500, flex: 1 }}>{k.naziv}</span>
-                  {k.oib && <span style={{ fontSize: 12, color: "var(--ink-3)", fontFamily: "monospace" }}>{k.oib}</span>}
-                  <span style={{ fontSize: 11, background: "var(--cream)", borderRadius: 3, padding: "1px 6px", color: "var(--ink-3)" }}>
-                    {k.tip === "pravna" ? "Pravna" : "Fizička"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -196,65 +76,145 @@ export default function NovPredmetModal({ onSave, onClose, initialData }) {
           <span className="modal-title">Novi predmet</span>
           <button className="btn-close" onClick={onClose}>×</button>
         </div>
+
         <div className="modal-body">
           {error && <div style={{ color: "var(--red)", marginBottom: 16, fontSize: 13 }}>⚠ {error}</div>}
           <div className="form-grid">
 
-            {/* ── Vrsta + Oznaka ─────────────────────────────────────────── */}
+            {/* ── Vrsta ── */}
             <div className="form-group">
               <label>Vrsta predmeta</label>
-              <select value={form.vrsta} onChange={(e) => set("vrsta", e.target.value)}>
-                {GRUPE.map((g) => (
-                  <optgroup key={g.naziv} label={g.naziv}>
-                    {g.vrste.map((v) => (
-                      <option key={v.kod} value={v.kod}>{v.kod} – {v.naziv}</option>
-                    ))}
-                  </optgroup>
-                ))}
+              <select value={form.vrsta} onChange={(e) => {
+                const v = e.target.value;
+                setForm((f) => ({ ...f, vrsta: v, strankaUloga: "Tužitelj", ulogaKlijenta: "Naručitelj" }));
+              }}>
+                <option value="SPORNI">Sporni</option>
+                <option value="NESPORNI">Nesporni</option>
               </select>
             </div>
-            <div className="form-group" style={{ justifyContent: "flex-end" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                Oznaka
+
+            {/* ── Naziv predmeta ── */}
+            <div className="form-group">
+              <label>Naziv predmeta *</label>
+              <input
+                placeholder={isSporni ? "npr. Ovrha, Kazneni postupak, Razvod..." : "npr. Osnivanje d.o.o., Ugovor o najmu..."}
+                value={form.nazivPredmeta}
+                onChange={(e) => set("nazivPredmeta", e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            {/* ── Oznaka ── */}
+            <div className="form-group full">
+              <label style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span>Oznaka predmeta</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 5, fontWeight: 400, fontSize: 12, color: "var(--ink-3)" }}>
                   <input
                     type="checkbox"
-                    checked={rucnaOznaka}
-                    onChange={(e) => { setRucnaOznaka(e.target.checked); setOznaka(""); }}
+                    checked={form.rucnaOznaka}
+                    onChange={(e) => set("rucnaOznaka", e.target.checked)}
                     style={{ width: "auto", margin: 0, cursor: "pointer" }}
                   />
                   Unesi ručno
                 </span>
               </label>
-              {rucnaOznaka
-                ? <input placeholder={`npr. ${form.vrsta}0023/22`} value={oznaka} onChange={(e) => setOznaka(e.target.value)} autoFocus />
-                : <input value={`${form.vrsta}XXXX/${String(new Date().getFullYear()).slice(-2)}`} disabled style={{ opacity: .5 }} />
-              }
+              {form.rucnaOznaka ? (
+                <input
+                  placeholder={`npr. KP0023/${godina}`}
+                  value={form.oznaka}
+                  onChange={(e) => set("oznaka", e.target.value)}
+                />
+              ) : (
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    style={{ width: 100 }}
+                    placeholder="Prefix (npr. KP)"
+                    maxLength={8}
+                    value={form.oznakaPrefix}
+                    onChange={(e) => set("oznakaPrefix", e.target.value.toUpperCase())}
+                  />
+                  <span style={{ fontSize: 13, color: "var(--ink-3)", whiteSpace: "nowrap" }}>
+                    → <span style={{ fontFamily: "monospace", color: "var(--ink-2)", fontWeight: 500 }}>{previewOznaka}</span>
+                  </span>
+                </div>
+              )}
             </div>
 
-            {/* ════════════════ SPORNI ════════════════ */}
-            {isSporni && (
+            {/* ── Klijent ureda (zaključan ako dolazi s KlijentPage) ── */}
+            {initialData?.klijent && (
+              <div className="form-group full">
+                <label>Klijent ureda</label>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "8px 12px", background: "var(--surface-3)",
+                  border: "1px solid var(--border)", borderRadius: 6,
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, flex: 1 }}>👤 {initialData.klijent.naziv}</span>
+                  {initialData.klijent.oib && (
+                    <span style={{ fontSize: 12, color: "var(--ink-3)", fontFamily: "monospace" }}>{initialData.klijent.oib}</span>
+                  )}
+                  <span style={{ fontSize: 11, color: "var(--ink-3)", padding: "2px 7px", background: "var(--border)", borderRadius: 4 }}>zaključano</span>
+                </div>
+              </div>
+            )}
+
+            {isSporni ? (
               <>
-                {klijentSearchUI}
+                {/* ── Stranka (SPORNI) ── */}
+                {!klijentLocked && (
+                  <>
+                    <div className="form-group">
+                      <label>Stranka – ime i prezime / naziv *</label>
+                      <input
+                        placeholder="Ime i prezime ili naziv tvrtke"
+                        value={form.strankaIme}
+                        onChange={(e) => set("strankaIme", e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Stranka – OIB</label>
+                      <input
+                        placeholder="11 znamenki" maxLength={11}
+                        value={form.strankaOib}
+                        onChange={(e) => set("strankaOib", e.target.value.replace(/\D/g, ""))}
+                      />
+                    </div>
+                  </>
+                )}
+                <div className="form-group full">
+                  <label>Uloga stranke u predmetu *</label>
+                  <select value={form.strankaUloga} onChange={(e) => set("strankaUloga", e.target.value)}>
+                    {ULOGE_SPORNI.map((u) => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
 
-                <div className="form-group">
-                  <label>Tužitelj – ime i prezime / naziv *</label>
-                  <input placeholder="Ime i prezime ili naziv tvrtke" value={form.tuziteljIme} onChange={(e) => set("tuziteljIme", e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label>Tužitelj – OIB</label>
-                  <input placeholder="11 znamenki" maxLength={11} value={form.tuziteljOib} onChange={(e) => set("tuziteljOib", e.target.value.replace(/\D/g, ""))} />
-                </div>
+                {form.strankaUloga === "Umješač" && (
+                  <div className="form-group full">
+                    <label>Strana umješača</label>
+                    <select value={form.stranaUmjesaca} onChange={(e) => set("stranaUmjesaca", e.target.value)}>
+                      <option value="tuzitelj">Na strani tužitelja</option>
+                      <option value="tuzenik">Na strani tuženika</option>
+                    </select>
+                  </div>
+                )}
 
+                {/* ── Protustranka (SPORNI, neobavezno) ── */}
                 <div className="form-group">
-                  <label>Tuženi – ime i prezime / naziv *</label>
-                  <input placeholder="Ime i prezime ili naziv tvrtke" value={form.tuzeniIme} onChange={(e) => set("tuzeniIme", e.target.value)} />
+                  <label>Protustranka – ime i prezime / naziv</label>
+                  <input
+                    placeholder="Ime i prezime ili naziv tvrtke (opcionalno)"
+                    value={form.protustrankaIme}
+                    onChange={(e) => set("protustrankaIme", e.target.value)}
+                  />
                 </div>
                 <div className="form-group">
-                  <label>Tuženi – OIB</label>
-                  <input placeholder="11 znamenki" maxLength={11} value={form.tuzeniOib} onChange={(e) => set("tuzeniOib", e.target.value.replace(/\D/g, ""))} />
+                  <label>Protustranka – OIB</label>
+                  <input
+                    placeholder="11 znamenki" maxLength={11}
+                    value={form.protustrankaOib}
+                    onChange={(e) => set("protustrankaOib", e.target.value.replace(/\D/g, ""))}
+                  />
                 </div>
-
                 <div className="form-group">
                   <label>Sud</label>
                   <input placeholder="npr. Općinski sud Zagreb" value={form.sud} onChange={(e) => set("sud", e.target.value)} />
@@ -263,62 +223,61 @@ export default function NovPredmetModal({ onSave, onClose, initialData }) {
                   <label>Sudac</label>
                   <input placeholder="Ime i prezime suca" value={form.sudac} onChange={(e) => set("sudac", e.target.value)} />
                 </div>
-
-                <div className="form-group">
-                  <label>Poslovni broj suda</label>
-                  <input placeholder="npr. P-123/2025" value={form.poslovniBroj} onChange={(e) => set("poslovniBroj", e.target.value)} />
-                </div>
                 <div className="form-group">
                   <label>VPS – Vrijednost predmeta spora</label>
                   <input placeholder="npr. 50.000,00 EUR (opcionalno)" value={form.vps} onChange={(e) => set("vps", e.target.value)} />
                 </div>
               </>
-            )}
-
-            {/* ════════════════ NESPORNI ════════════════ */}
-            {isNesporni && (
+            ) : (
               <>
-                {klijentSearchUI}
-
+                {/* ── Klijent (NESPORNI) ── */}
                 <div className="form-group">
                   <label>Klijent – ime i prezime / naziv *</label>
-                  <input placeholder="Ime i prezime ili naziv tvrtke" value={form.tuziteljIme} onChange={(e) => set("tuziteljIme", e.target.value)} />
+                  <input
+                    placeholder="Ime i prezime ili naziv tvrtke"
+                    value={form.strankaIme}
+                    onChange={(e) => set("strankaIme", e.target.value)}
+                    readOnly={klijentLocked}
+                    style={klijentLocked ? { opacity: .6 } : undefined}
+                  />
                 </div>
                 <div className="form-group">
                   <label>Klijent – OIB</label>
-                  <input placeholder="11 znamenki" maxLength={11} value={form.tuziteljOib} onChange={(e) => set("tuziteljOib", e.target.value.replace(/\D/g, ""))} />
+                  <input
+                    placeholder="11 znamenki" maxLength={11}
+                    value={form.strankaOib}
+                    onChange={(e) => set("strankaOib", e.target.value.replace(/\D/g, ""))}
+                    readOnly={klijentLocked}
+                    style={klijentLocked ? { opacity: .6 } : undefined}
+                  />
                 </div>
-
                 <div className="form-group full">
-                  <label>Sud (opcionalno)</label>
-                  <input placeholder="npr. Trgovački sud Zagreb" value={form.sud} onChange={(e) => set("sud", e.target.value)} />
+                  <label>Uloga klijenta u predmetu *</label>
+                  <select value={form.ulogaKlijenta} onChange={(e) => set("ulogaKlijenta", e.target.value)}>
+                    {ULOGE_NESPORNI.map((u) => <option key={u} value={u}>{u}</option>)}
+                  </select>
                 </div>
               </>
             )}
 
-            {/* ════════════════ SAVJETODAVNI ════════════════ */}
-            {isSavjetodavni && (
-              <>
-                {klijentSearchUI}
+            {/* ── Poslovni broj (oba tipa) ── */}
+            <div className="form-group">
+              <label>{isSporni ? "Poslovni broj suda" : "Poslovni broj / referenca"}</label>
+              <input
+                placeholder={isSporni ? "npr. P-123/2025" : "npr. Ugovor-2025-001 (opcionalno)"}
+                value={form.poslovniBroj}
+                onChange={(e) => set("poslovniBroj", e.target.value)}
+              />
+            </div>
 
-                <div className="form-group">
-                  <label>Klijent – ime i prezime / naziv *</label>
-                  <input placeholder="Ime i prezime ili naziv tvrtke" value={form.tuziteljIme} onChange={(e) => set("tuziteljIme", e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label>Klijent – OIB</label>
-                  <input placeholder="11 znamenki" maxLength={11} value={form.tuziteljOib} onChange={(e) => set("tuziteljOib", e.target.value.replace(/\D/g, ""))} />
-                </div>
-              </>
-            )}
-
-            {/* ── Opis (sve vrste) ─────────────────────────────────────── */}
+            {/* ── Opis ── */}
             <div className="form-group full">
               <label>Kratak opis predmeta</label>
-              <textarea placeholder="Ukratko opisite predmet..." value={form.opis} onChange={(e) => set("opis", e.target.value)} />
+              <textarea placeholder="Ukratko opišite predmet..." value={form.opis} onChange={(e) => set("opis", e.target.value)} />
             </div>
           </div>
         </div>
+
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onClose}>Odustani</button>
           <button className="btn btn-primary" onClick={submit} disabled={loading}>

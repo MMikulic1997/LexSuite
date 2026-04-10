@@ -41,26 +41,51 @@ app.use(cors());
 app.use(express.json());
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function generateOznaka(vrsta, godina) {
-  const key = `${vrsta}/${godina}`;
+function generateOznaka(prefix, godina) {
+  // prefix može biti "" (nema prefiksa) ili npr. "KP", "OVR" itd.
+  const key = `${prefix || "_"}/${godina}`;
   const row = db.prepare("SELECT value FROM counters WHERE key = ?").get(key);
   const newVal = (row ? row.value : 0) + 1;
   if (row) db.prepare("UPDATE counters SET value = ? WHERE key = ?").run(newVal, key);
   else     db.prepare("INSERT INTO counters (key, value) VALUES (?, ?)").run(key, newVal);
-  return `${vrsta}${String(newVal).padStart(4, "0")}/${godina}`;
+  return `${prefix || ""}${String(newVal).padStart(4, "0")}/${godina}`;
 }
 
 function rowToRok(r) {
   return {
-    id:          r.id,
-    naziv:       r.naziv,
-    datum:       r.datum,
-    vrijeme:     r.vrijeme     || "",
-    lokacija:    r.lokacija    || "",
-    napomena:    r.napomena    || "",
-    dovrseno:    r.dovrseno === 1,
-    tipPristupa: r.tip_pristupa || "opci",
-    vrstaRoka:   r.vrsta_roka   || "ostalo",
+    id:        r.id,
+    naziv:     r.naziv,
+    datum:     r.datum,
+    vrijeme:   r.vrijeme  || "",
+    lokacija:  r.lokacija || "",
+    napomena:  r.napomena || "",
+    dovrseno:  r.dovrseno === 1,
+    vrstaRoka: r.vrsta_roka || "ostalo",
+  };
+}
+
+function rowToStavka(s) {
+  return {
+    id:        s.id,
+    opis:      s.opis,
+    datum:     s.datum,
+    iznos:     s.iznos,
+    pdv:       s.pdv === 1,
+    napomena:  s.napomena || "",
+    createdAt: s.created_at,
+  };
+}
+
+function rowToZadatak(z) {
+  return {
+    id:            z.id,
+    naziv:         z.naziv,
+    opis:          z.opis            || "",
+    rok:           z.rok             || "",
+    zaduzenaOsoba: z.zaduzena_osoba  || "",
+    prioritet:     z.prioritet       || "srednji",
+    status:        z.status          || "nije_poceto",
+    createdAt:     z.created_at,
   };
 }
 
@@ -69,11 +94,14 @@ function rowToPredmet(p) {
     id:             p.id,
     oznaka:         p.oznaka,
     vrsta:          p.vrsta,
-    tuzitelj:       { ime: p.tuzitelj_ime, oib: p.tuzitelj_oib },
-    tuzeni:         { ime: p.tuzeni_ime,   oib: p.tuzeni_oib   },
+    nazivPredmeta:  p.naziv_predmeta || "",
+    stranka:        { ime: p.stranka_ime || "", oib: p.stranka_oib || "", uloga: p.stranka_uloga || "Tužitelj" },
+    protustranka:   { ime: p.protustranka_ime || "", oib: p.protustranka_oib || "" },
+    stranaUmjesaca: p.strana_umjesaca || "tuzitelj",
     poslovniBroj:   p.poslovni_broj || "",
     vps:            p.vps           || "",
     klijentId:      p.klijent_id    || null,
+    ulogaKlijenta:  p.uloga_klijenta || "Tužitelj",
     sud:            p.sud,
     sudac:          p.sudac,
     opis:           p.opis,
@@ -106,6 +134,14 @@ function getPredmetFull(id) {
     .prepare("SELECT * FROM tijek WHERE predmet_id = ? ORDER BY datum, created_at")
     .all(id)
     .map((t) => ({ id: t.id, datum: t.datum, tekst: t.tekst, createdAt: t.created_at }));
+  base.zadaci = db
+    .prepare("SELECT * FROM zadaci WHERE predmet_id = ? ORDER BY created_at")
+    .all(id)
+    .map(rowToZadatak);
+  base.troskovnikStavke = db
+    .prepare("SELECT * FROM troskovnik_stavke WHERE predmet_id = ? ORDER BY datum, created_at")
+    .all(id)
+    .map(rowToStavka);
   return base;
 }
 
@@ -131,22 +167,29 @@ app.get("/api/predmeti/:id", (req, res) => {
 });
 
 app.post("/api/predmeti", (req, res) => {
-  const { vrsta, oznaka: oznakaSent, tuzitelj, tuzeni, poslovniBroj, vps, klijentId, sud, sudac, opis } = req.body;
-  const tIme = typeof tuzitelj === "object" ? tuzitelj.ime  : tuzitelj;
-  const tOib = typeof tuzitelj === "object" ? (tuzitelj.oib || "") : "";
-  const nIme = typeof tuzeni   === "object" ? tuzeni.ime    : tuzeni;
-  const nOib = typeof tuzeni   === "object" ? (tuzeni.oib   || "") : "";
-  if (!vrsta || !tIme || !nIme)
-    return res.status(400).json({ error: "Vrsta, tužitelj i tuženi su obavezni" });
+  const { vrsta, oznaka: oznakaSent, oznakaPrefix, nazivPredmeta, stranka, protustranka, poslovniBroj, vps, klijentId, sud, sudac, opis, ulogaKlijenta, stranaUmjesaca } = req.body;
+  const sIme   = stranka?.ime   || "";
+  const sOib   = stranka?.oib   || "";
+  const sUloga = stranka?.uloga || (vrsta === "SPORNI" ? "Tužitelj" : "");
+  const pIme   = protustranka?.ime || "";
+  const pOib   = protustranka?.oib || "";
+
+  if (!vrsta || !["SPORNI","NESPORNI"].includes(vrsta))
+    return res.status(400).json({ error: "Vrsta mora biti SPORNI ili NESPORNI" });
+  if (!nazivPredmeta?.trim())
+    return res.status(400).json({ error: "Naziv predmeta je obavezan" });
+  if (!sIme?.trim())
+    return res.status(400).json({ error: "Ime stranke/klijenta je obavezno" });
 
   const godina = String(new Date().getFullYear()).slice(-2);
-  const oznaka = oznakaSent ? oznakaSent.trim() : generateOznaka(vrsta, godina);
+  const oznaka = oznakaSent ? oznakaSent.trim() : generateOznaka((oznakaPrefix || "").trim(), godina);
   const id = uuidv4();
+  const defaultUloga = vrsta === "SPORNI" ? "Tužitelj" : "Naručitelj";
   db.prepare(`
     INSERT INTO predmeti
-      (id, oznaka, vrsta, tuzitelj_ime, tuzitelj_oib, tuzeni_ime, tuzeni_oib, poslovni_broj, vps, klijent_id, sud, sudac, opis, status, datum_otvaranja)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'aktivan', ?)
-  `).run(id, oznaka, vrsta, tIme, tOib, nIme, nOib, poslovniBroj || "", vps || "", klijentId || null, sud || "", sudac || "", opis || "", new Date().toISOString());
+      (id, oznaka, vrsta, naziv_predmeta, stranka_ime, stranka_oib, stranka_uloga, protustranka_ime, protustranka_oib, poslovni_broj, vps, klijent_id, sud, sudac, opis, uloga_klijenta, strana_umjesaca, status, datum_otvaranja)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'aktivan', ?)
+  `).run(id, oznaka, vrsta, nazivPredmeta.trim(), sIme.trim(), sOib, sUloga || defaultUloga, pIme.trim(), pOib, poslovniBroj || "", vps || "", klijentId || null, sud || "", sudac || "", opis || "", ulogaKlijenta || sUloga || defaultUloga, stranaUmjesaca || "tuzitelj", new Date().toISOString());
 
   res.status(201).json(getPredmetFull(id));
 });
@@ -154,15 +197,18 @@ app.post("/api/predmeti", (req, res) => {
 app.patch("/api/predmeti/:id", (req, res) => {
   const p = db.prepare("SELECT * FROM predmeti WHERE id = ?").get(req.params.id);
   if (!p) return res.status(404).json({ error: "Predmet nije pronađen" });
-  const { poslovniBroj, vps, klijentId, sud, sudac, opis, status } = req.body;
-  db.prepare("UPDATE predmeti SET poslovni_broj = ?, vps = ?, klijent_id = ?, sud = ?, sudac = ?, opis = ?, status = ? WHERE id = ?").run(
-    poslovniBroj !== undefined ? poslovniBroj : p.poslovni_broj,
-    vps          !== undefined ? vps          : p.vps,
-    klijentId    !== undefined ? klijentId    : p.klijent_id,
-    sud          !== undefined ? sud          : p.sud,
-    sudac        !== undefined ? sudac        : p.sudac,
-    opis         !== undefined ? opis         : p.opis,
-    status       !== undefined ? status       : p.status,
+  const { nazivPredmeta, poslovniBroj, vps, klijentId, sud, sudac, opis, status, ulogaKlijenta, stranaUmjesaca } = req.body;
+  db.prepare("UPDATE predmeti SET naziv_predmeta = ?, poslovni_broj = ?, vps = ?, klijent_id = ?, sud = ?, sudac = ?, opis = ?, status = ?, uloga_klijenta = ?, strana_umjesaca = ? WHERE id = ?").run(
+    nazivPredmeta  !== undefined ? nazivPredmeta  : p.naziv_predmeta,
+    poslovniBroj   !== undefined ? poslovniBroj   : p.poslovni_broj,
+    vps            !== undefined ? vps            : p.vps,
+    klijentId      !== undefined ? klijentId      : p.klijent_id,
+    sud            !== undefined ? sud            : p.sud,
+    sudac          !== undefined ? sudac          : p.sudac,
+    opis           !== undefined ? opis           : p.opis,
+    status         !== undefined ? status         : p.status,
+    ulogaKlijenta  !== undefined ? ulogaKlijenta  : p.uloga_klijenta,
+    stranaUmjesaca !== undefined ? stranaUmjesaca : p.strana_umjesaca,
     req.params.id
   );
   res.json(getPredmetFull(req.params.id));
@@ -176,14 +222,14 @@ app.delete("/api/predmeti/:id", (req, res) => {
 // ── Globalni rokovnik ──────────────────────────────────────────────────────────
 app.get("/api/rokovi", (req, res) => {
   const rows = db.prepare(`
-    SELECT r.*, p.oznaka, p.tuzitelj_ime, p.tuzeni_ime
+    SELECT r.*, p.oznaka, p.stranka_ime, p.stranka_uloga, p.protustranka_ime, p.strana_umjesaca
     FROM rokovi r
     JOIN predmeti p ON p.id = r.predmet_id
     ORDER BY r.datum ASC
   `).all();
   res.json(rows.map((r) => ({
     ...rowToRok(r),
-    predmet: { id: r.predmet_id, oznaka: r.oznaka, tuziteljIme: r.tuzitelj_ime, tuzeniIme: r.tuzeni_ime },
+    predmet: { id: r.predmet_id, oznaka: r.oznaka, strankaIme: r.stranka_ime, strankaUloga: r.stranka_uloga, protustrankaIme: r.protustranka_ime, stranaUmjesaca: r.strana_umjesaca || "tuzitelj" },
   })));
 });
 
@@ -191,26 +237,25 @@ app.get("/api/rokovi", (req, res) => {
 app.post("/api/predmeti/:id/rokovi", (req, res) => {
   if (!db.prepare("SELECT id FROM predmeti WHERE id = ?").get(req.params.id))
     return res.status(404).json({ error: "Predmet nije pronađen" });
-  const { naziv, datum, napomena, tipPristupa, vrstaRoka, vrijeme, lokacija } = req.body;
+  const { naziv, datum, napomena, vrstaRoka, vrijeme, lokacija } = req.body;
   const id = uuidv4();
-  db.prepare("INSERT INTO rokovi (id, predmet_id, naziv, datum, napomena, tip_pristupa, vrsta_roka, vrijeme, lokacija) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .run(id, req.params.id, naziv, datum, napomena || "", tipPristupa || "opci", vrstaRoka || "ostalo", vrijeme || "", lokacija || "");
+  db.prepare("INSERT INTO rokovi (id, predmet_id, naziv, datum, napomena, vrsta_roka, vrijeme, lokacija) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+    .run(id, req.params.id, naziv, datum, napomena || "", vrstaRoka || "ostalo", vrijeme || "", lokacija || "");
   res.status(201).json(rowToRok(db.prepare("SELECT * FROM rokovi WHERE id = ?").get(id)));
 });
 
 app.patch("/api/predmeti/:id/rokovi/:rokId", (req, res) => {
   const rok = db.prepare("SELECT * FROM rokovi WHERE id = ? AND predmet_id = ?").get(req.params.rokId, req.params.id);
   if (!rok) return res.status(404).json({ error: "Rok nije pronađen" });
-  const naziv       = req.body.naziv       !== undefined ? req.body.naziv       : rok.naziv;
-  const datum       = req.body.datum       !== undefined ? req.body.datum       : rok.datum;
-  const napomena    = req.body.napomena    !== undefined ? req.body.napomena    : rok.napomena;
-  const dovrseno    = req.body.dovrseno    !== undefined ? (req.body.dovrseno ? 1 : 0) : rok.dovrseno;
-  const tipPristupa = req.body.tipPristupa !== undefined ? req.body.tipPristupa : rok.tip_pristupa;
-  const vrstaRoka   = req.body.vrstaRoka   !== undefined ? req.body.vrstaRoka   : rok.vrsta_roka;
-  const vrijeme     = req.body.vrijeme     !== undefined ? req.body.vrijeme     : rok.vrijeme;
-  const lokacija    = req.body.lokacija    !== undefined ? req.body.lokacija    : rok.lokacija;
-  db.prepare("UPDATE rokovi SET naziv = ?, datum = ?, napomena = ?, dovrseno = ?, tip_pristupa = ?, vrsta_roka = ?, vrijeme = ?, lokacija = ? WHERE id = ?")
-    .run(naziv, datum, napomena, dovrseno, tipPristupa, vrstaRoka, vrijeme, lokacija, rok.id);
+  const naziv     = req.body.naziv     !== undefined ? req.body.naziv                : rok.naziv;
+  const datum     = req.body.datum     !== undefined ? req.body.datum                : rok.datum;
+  const napomena  = req.body.napomena  !== undefined ? req.body.napomena             : rok.napomena;
+  const dovrseno  = req.body.dovrseno  !== undefined ? (req.body.dovrseno ? 1 : 0)  : rok.dovrseno;
+  const vrstaRoka = req.body.vrstaRoka !== undefined ? req.body.vrstaRoka            : rok.vrsta_roka;
+  const vrijeme   = req.body.vrijeme   !== undefined ? req.body.vrijeme              : rok.vrijeme;
+  const lokacija  = req.body.lokacija  !== undefined ? req.body.lokacija             : rok.lokacija;
+  db.prepare("UPDATE rokovi SET naziv = ?, datum = ?, napomena = ?, dovrseno = ?, vrsta_roka = ?, vrijeme = ?, lokacija = ? WHERE id = ?")
+    .run(naziv, datum, napomena, dovrseno, vrstaRoka, vrijeme, lokacija, rok.id);
   res.json(rowToRok(db.prepare("SELECT * FROM rokovi WHERE id = ?").get(rok.id)));
 });
 
@@ -286,6 +331,75 @@ app.post("/api/predmeti/:id/tijek", (req, res) => {
 
 app.delete("/api/predmeti/:id/tijek/:unosId", (req, res) => {
   db.prepare("DELETE FROM tijek WHERE id = ? AND predmet_id = ?").run(req.params.unosId, req.params.id);
+  res.json({ ok: true });
+});
+
+// ── Zadaci ─────────────────────────────────────────────────────────────────────
+app.get("/api/predmeti/:id/zadaci", (req, res) => {
+  if (!db.prepare("SELECT id FROM predmeti WHERE id = ?").get(req.params.id))
+    return res.status(404).json({ error: "Predmet nije pronađen" });
+  const rows = db.prepare("SELECT * FROM zadaci WHERE predmet_id = ? ORDER BY created_at").all(req.params.id);
+  res.json(rows.map(rowToZadatak));
+});
+
+app.post("/api/predmeti/:id/zadaci", (req, res) => {
+  if (!db.prepare("SELECT id FROM predmeti WHERE id = ?").get(req.params.id))
+    return res.status(404).json({ error: "Predmet nije pronađen" });
+  const { naziv, opis, rok, zaduzenaOsoba, prioritet } = req.body;
+  if (!naziv?.trim()) return res.status(400).json({ error: "Naziv je obavezan" });
+  const id = uuidv4();
+  const createdAt = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO zadaci (id, predmet_id, naziv, opis, rok, zaduzena_osoba, prioritet, status, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'nije_poceto', ?)
+  `).run(id, req.params.id, naziv.trim(), opis || "", rok || "", zaduzenaOsoba || "", prioritet || "srednji", createdAt);
+  res.status(201).json(rowToZadatak(db.prepare("SELECT * FROM zadaci WHERE id = ?").get(id)));
+});
+
+app.patch("/api/predmeti/:id/zadaci/:zadatakId", (req, res) => {
+  const z = db.prepare("SELECT * FROM zadaci WHERE id = ? AND predmet_id = ?").get(req.params.zadatakId, req.params.id);
+  if (!z) return res.status(404).json({ error: "Zadatak nije pronađen" });
+  const naziv         = req.body.naziv         !== undefined ? req.body.naziv.trim()  : z.naziv;
+  const opis          = req.body.opis          !== undefined ? req.body.opis          : z.opis;
+  const rok           = req.body.rok           !== undefined ? req.body.rok           : z.rok;
+  const zaduzenaOsoba = req.body.zaduzenaOsoba !== undefined ? req.body.zaduzenaOsoba : z.zaduzena_osoba;
+  const prioritet     = req.body.prioritet     !== undefined ? req.body.prioritet     : z.prioritet;
+  const status        = req.body.status        !== undefined ? req.body.status        : z.status;
+  db.prepare("UPDATE zadaci SET naziv = ?, opis = ?, rok = ?, zaduzena_osoba = ?, prioritet = ?, status = ? WHERE id = ?")
+    .run(naziv, opis, rok, zaduzenaOsoba, prioritet, status, z.id);
+  res.json(rowToZadatak(db.prepare("SELECT * FROM zadaci WHERE id = ?").get(z.id)));
+});
+
+app.delete("/api/predmeti/:id/zadaci/:zadatakId", (req, res) => {
+  db.prepare("DELETE FROM zadaci WHERE id = ? AND predmet_id = ?").run(req.params.zadatakId, req.params.id);
+  res.json({ ok: true });
+});
+
+// ── Troškovnik ─────────────────────────────────────────────────────────────────
+app.get("/api/predmeti/:id/troskovnik", (req, res) => {
+  if (!db.prepare("SELECT id FROM predmeti WHERE id = ?").get(req.params.id))
+    return res.status(404).json({ error: "Predmet nije pronađen" });
+  res.json(db.prepare("SELECT * FROM troskovnik_stavke WHERE predmet_id = ? ORDER BY datum, created_at").all(req.params.id).map(rowToStavka));
+});
+
+app.post("/api/predmeti/:id/troskovnik", (req, res) => {
+  if (!db.prepare("SELECT id FROM predmeti WHERE id = ?").get(req.params.id))
+    return res.status(404).json({ error: "Predmet nije pronađen" });
+  const { opis, datum, iznos, pdv, napomena } = req.body;
+  if (!opis?.trim()) return res.status(400).json({ error: "Opis radnje je obavezan" });
+  if (!datum)        return res.status(400).json({ error: "Datum je obavezan" });
+  if (iznos === undefined || iznos === null || isNaN(Number(iznos)))
+    return res.status(400).json({ error: "Iznos mora biti broj" });
+  const id = uuidv4();
+  db.prepare(`
+    INSERT INTO troskovnik_stavke (id, predmet_id, opis, datum, iznos, pdv, napomena, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, req.params.id, opis.trim(), datum, Number(iznos), pdv ? 1 : 0, napomena?.trim() || "", new Date().toISOString());
+  res.status(201).json(rowToStavka(db.prepare("SELECT * FROM troskovnik_stavke WHERE id = ?").get(id)));
+});
+
+app.delete("/api/predmeti/:id/troskovnik/:stavkaId", (req, res) => {
+  db.prepare("DELETE FROM troskovnik_stavke WHERE id = ? AND predmet_id = ?").run(req.params.stavkaId, req.params.id);
   res.json({ ok: true });
 });
 

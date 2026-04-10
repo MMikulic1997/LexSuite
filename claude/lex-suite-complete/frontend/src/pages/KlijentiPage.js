@@ -67,21 +67,21 @@ export default function KlijentiPage({ onSelect, onSelectPredmet }) {
         <div className="card-header" style={{ flexWrap: "wrap", gap: 8 }}>
           <div style={{ display: "flex", gap: 8, flex: 1, alignItems: "center" }}>
             <input
-              style={{ border: "1px solid var(--cream)", borderRadius: 6, padding: "7px 12px", fontSize: 13, width: 240 }}
+              style={{ border: "1px solid var(--border)", borderRadius: 6, padding: "7px 12px", fontSize: 13, width: 240 }}
               placeholder="Pretraži po imenu ili OIB-u..."
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             />
             {/* View toggle */}
-            <div style={{ display: "flex", border: "1px solid var(--cream)", borderRadius: 6, overflow: "hidden" }}>
+            <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 6, overflow: "hidden" }}>
               {[["tablica","Tablica"],["pregled","Pregled"]].map(([v, label]) => (
                 <button
                   key={v}
                   onClick={() => setView(v)}
                   style={{
                     padding: "7px 14px", fontSize: 13, border: "none", cursor: "pointer",
-                    background: view === v ? "var(--primary)" : "transparent",
-                    color: view === v ? "#fff" : "var(--ink-3)",
+                    background: view === v ? "var(--button-bg)" : "transparent",
+                    color: view === v ? "var(--button-text)" : "var(--ink-3)",
                     fontWeight: view === v ? 600 : 400,
                   }}
                 >{label}</button>
@@ -115,7 +115,7 @@ export default function KlijentiPage({ onSelect, onSelectPredmet }) {
                   <tr key={k.id} style={{ cursor: "pointer" }} onClick={() => onSelect(k.id)}>
                     <td style={{ fontWeight: 500 }}>{k.naziv}</td>
                     <td>
-                      <span style={{ fontSize: 12, background: "var(--cream)", borderRadius: 4, padding: "2px 7px" }}>
+                      <span style={{ fontSize: 12, background: "var(--border)", borderRadius: 4, padding: "2px 7px" }}>
                         {TIP_LABEL[k.tip] || k.tip}
                       </span>
                     </td>
@@ -146,13 +146,13 @@ export default function KlijentiPage({ onSelect, onSelectPredmet }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {filteredPregled.map((k) => (
                   <div key={k.id} style={{
-                    border: "1px solid var(--cream)", borderRadius: 8,
-                    background: "#fff", overflow: "hidden",
+                    border: "1px solid var(--border)", borderRadius: 8,
+                    background: "var(--surface)", overflow: "hidden",
                   }}>
                     {/* Client header row */}
                     <div style={{
                       display: "flex", alignItems: "center", gap: 12,
-                      padding: "12px 16px", borderBottom: k.predmeti.length > 0 ? "1px solid var(--cream)" : "none",
+                      padding: "12px 16px", borderBottom: k.predmeti.length > 0 ? "1px solid var(--border)" : "none",
                       cursor: "pointer",
                     }}
                       onClick={() => onSelect(k.id)}
@@ -161,7 +161,7 @@ export default function KlijentiPage({ onSelect, onSelectPredmet }) {
                         <span style={{ fontWeight: 600, fontSize: 15 }}>{k.naziv}</span>
                         {k.oib && <span style={{ marginLeft: 10, fontSize: 12, color: "var(--ink-3)", fontFamily: "monospace" }}>{k.oib}</span>}
                       </div>
-                      <span style={{ fontSize: 12, background: "var(--cream)", borderRadius: 4, padding: "2px 7px", flexShrink: 0 }}>
+                      <span style={{ fontSize: 12, background: "var(--border)", borderRadius: 4, padding: "2px 7px", flexShrink: 0 }}>
                         {TIP_LABEL[k.tip] || k.tip}
                       </span>
                       {k.predmeti.length > 0 && (
@@ -190,9 +190,9 @@ export default function KlijentiPage({ onSelect, onSelectPredmet }) {
                               style={{
                                 display: "flex", alignItems: "center", gap: 10,
                                 padding: "9px 16px 9px 32px",
-                                borderBottom: i < k.predmeti.length - 1 ? "1px solid var(--cream)" : "none",
+                                borderBottom: i < k.predmeti.length - 1 ? "1px solid var(--border)" : "none",
                                 cursor: onSelectPredmet ? "pointer" : "default",
-                                background: "var(--parchment)",
+                                background: "var(--surface-2)",
                               }}
                               onClick={() => onSelectPredmet?.(p.id)}
                             >
@@ -212,7 +212,7 @@ export default function KlijentiPage({ onSelect, onSelectPredmet }) {
                     )}
 
                     {k.predmeti.length === 0 && (
-                      <div style={{ padding: "10px 16px 10px 32px", fontSize: 13, color: "var(--ink-3)", background: "var(--parchment)" }}>
+                      <div style={{ padding: "10px 16px 10px 32px", fontSize: 13, color: "var(--ink-3)", background: "var(--surface-2)" }}>
                         Nema predmeta
                       </div>
                     )}

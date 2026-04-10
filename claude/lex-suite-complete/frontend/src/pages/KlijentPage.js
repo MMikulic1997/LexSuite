@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { api } from "../utils/api";
+import { getStrankeOrder } from "../utils/strankeUtils";
 import KlijentModal from "../components/KlijentModal";
 import NovPredmetModal from "../components/NovPredmetModal";
 
@@ -38,8 +39,6 @@ export default function KlijentPage({ klijentId, onBack, onSelectPredmet }) {
     onSelectPredmet(p.id);
   };
 
-  const formatDatum = (iso) => new Date(iso).toLocaleDateString("hr-HR");
-
   if (!klijent) return <div style={{ padding: 40, color: "var(--ink-3)", fontSize: 14 }}>Učitavam...</div>;
 
   return (
@@ -56,7 +55,7 @@ export default function KlijentPage({ klijentId, onBack, onSelectPredmet }) {
             ← Klijenti
           </button>
           <h2 style={{ marginBottom: 6 }}>{klijent.naziv}</h2>
-          <span style={{ fontSize: 12, background: "var(--cream)", borderRadius: 4, padding: "2px 8px" }}>
+          <span style={{ fontSize: 12, background: "var(--border)", borderRadius: 4, padding: "2px 8px" }}>
             {TIP_LABEL[klijent.tip] || klijent.tip}
           </span>
         </div>
@@ -88,7 +87,7 @@ export default function KlijentPage({ klijentId, onBack, onSelectPredmet }) {
               </div>
             ) : null)}
             {klijent.biljeske && (
-              <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--cream)" }}>
+              <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
                 <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".5px", color: "var(--ink-3)", marginBottom: 6 }}>
                   Bilješke
                 </div>
@@ -117,10 +116,10 @@ export default function KlijentPage({ klijentId, onBack, onSelectPredmet }) {
               <thead>
                 <tr>
                   <th>Oznaka</th>
-                  <th>Tužitelj</th>
-                  <th>Tuženi</th>
+                  <th>Naziv predmeta</th>
+                  <th>Stranke</th>
+                  <th>Uloga</th>
                   <th>Sud</th>
-                  <th>Otvoreno</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -128,19 +127,27 @@ export default function KlijentPage({ klijentId, onBack, onSelectPredmet }) {
                 {predmeti.map((p) => (
                   <tr key={p.id} style={{ cursor: "pointer" }} onClick={() => onSelectPredmet(p.id)}>
                     <td>
-                      <span className="oznaka">{p.oznaka}</span>
-                      <span className={`badge badge-${p.vrsta.toLowerCase()}`} style={{ marginLeft: 8 }}>{p.vrsta}</span>
+                      <div className="oznaka">{p.oznaka}</div>
+                      {p.poslovniBroj && (
+                        <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>{p.poslovniBroj}</div>
+                      )}
                     </td>
+                    <td style={{ fontSize: 13 }}>{p.nazivPredmeta || <span style={{ color: "var(--ink-4)" }}>—</span>}</td>
                     <td>
-                      <div>{p.tuzitelj.ime}</div>
-                      {p.tuzitelj.oib && <div style={{ fontSize: 11, color: "var(--ink-3)" }}>OIB: {p.tuzitelj.oib}</div>}
+                      {p.vrsta === "SPORNI" ? (() => {
+                        const { lijevo, desno } = getStrankeOrder(p);
+                        return (
+                          <>
+                            <div style={{ fontSize: 13 }}>{lijevo.ime}</div>
+                            {desno.ime && <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>vs. {desno.ime}</div>}
+                          </>
+                        );
+                      })() : (
+                        <div style={{ fontSize: 13 }}>{p.stranka?.ime}</div>
+                      )}
                     </td>
-                    <td>
-                      <div>{p.tuzeni.ime}</div>
-                      {p.tuzeni.oib && <div style={{ fontSize: 11, color: "var(--ink-3)" }}>OIB: {p.tuzeni.oib}</div>}
-                    </td>
+                    <td style={{ fontSize: 12, color: "var(--ink-3)" }}>{p.ulogaKlijenta || "—"}</td>
                     <td style={{ color: "var(--ink-3)", fontSize: 13 }}>{p.sud || "—"}</td>
-                    <td style={{ color: "var(--ink-3)", fontSize: 13 }}>{formatDatum(p.datumOtvaranja)}</td>
                     <td><span className={`badge badge-${p.status}`}>{p.status}</span></td>
                   </tr>
                 ))}
@@ -152,7 +159,7 @@ export default function KlijentPage({ klijentId, onBack, onSelectPredmet }) {
 
       {editModal && (
         <KlijentModal
-          initial={klijent}
+          initialData={klijent}
           onSave={handleUpdate}
           onClose={() => setEditModal(false)}
         />

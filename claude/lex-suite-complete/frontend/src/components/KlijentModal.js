@@ -2,12 +2,12 @@ import React, { useState } from "react";
 
 const EMPTY_FORM = { naziv: "", oib: "", tip: "fizicka", email: "", telefon: "", adresa: "", biljeske: "" };
 
-export default function KlijentModal({ initial, onSave, onClose }) {
-  const [form, setForm]   = useState(initial || EMPTY_FORM);
+export default function KlijentModal({ initialData, onSave, onClose }) {
+  const [form, setForm]   = useState(initialData || EMPTY_FORM);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const isEdit = !!initial;
+  const isEdit = !!initialData;
 
   const submit = async () => {
     if (!form.naziv.trim()) { setError("Naziv je obavezan."); return; }
