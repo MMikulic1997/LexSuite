@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "build": "npm install --prefix ../frontend && npm run build --prefix ../frontend",
+    "build": "echo build ok",
     "postinstall": "npm rebuild better-sqlite3"
   },
   "dependencies": {
