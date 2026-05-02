@@ -139,7 +139,7 @@ export default function KlijentPage({ klijentId, onBack, onSelectPredmet }) {
                         return (
                           <>
                             <div style={{ fontSize: 13 }}>{lijevo.ime}</div>
-                            {desno.ime && <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>vs. {desno.ime}</div>}
+                            {desno.ime && <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>c/a {desno.ime}</div>}
                           </>
                         );
                       })() : (

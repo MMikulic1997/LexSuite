@@ -86,7 +86,7 @@ export default function SviPredmetiPage({ onSelectPredmet, onSelectKlijent }) {
                           </div>
                           {desno.ime && (
                             <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-                              vs. {desno.ime}
+                              c/a {desno.ime}
                             </div>
                           )}
                         </>

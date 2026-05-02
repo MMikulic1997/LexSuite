@@ -404,6 +404,13 @@ select { cursor: pointer; }
 .info-value { color: var(--ink); }
 
 /* ── Dark mode toggle button ─────────────── */
+.topbar-icon-btn {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: none; border: 1px solid transparent;
+  display: flex; align-items: center; justify-content: center;
+  cursor: default; color: var(--ink-3); transition: all .15s;
+}
+
 .dark-toggle {
   width: 36px; height: 36px; border-radius: 50%;
   background: var(--surface-2); border: 1px solid var(--border);

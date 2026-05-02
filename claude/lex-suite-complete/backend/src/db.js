@@ -123,6 +123,8 @@ if (!rokCols.includes("tip_pristupa")) db.exec("ALTER TABLE rokovi ADD COLUMN ti
 if (!rokCols.includes("vrsta_roka"))   db.exec("ALTER TABLE rokovi ADD COLUMN vrsta_roka   TEXT NOT NULL DEFAULT 'ostalo'");
 if (!rokCols.includes("vrijeme"))      db.exec("ALTER TABLE rokovi ADD COLUMN vrijeme      TEXT NOT NULL DEFAULT ''");
 if (!rokCols.includes("lokacija"))     db.exec("ALTER TABLE rokovi ADD COLUMN lokacija     TEXT NOT NULL DEFAULT ''");
+if (!rokCols.includes("sudac_roka"))   db.exec("ALTER TABLE rokovi ADD COLUMN sudac_roka   TEXT NOT NULL DEFAULT ''");
+if (!rokCols.includes("dvorana"))      db.exec("ALTER TABLE rokovi ADD COLUMN dvorana      TEXT NOT NULL DEFAULT ''");
 
 const dokCols = db.prepare("PRAGMA table_info(dokumenti)").all().map((c) => c.name);
 if (!dokCols.includes("putanja"))  db.exec("ALTER TABLE dokumenti ADD COLUMN putanja  TEXT    NOT NULL DEFAULT ''");

@@ -118,30 +118,33 @@ export default function RokovnikPage({ onSelectPredmet }) {
       // Ročišta/Sastanci ili miješano — s vremenom i lokacijom
       autoTable(doc, {
         startY: 38,
-        head: [["Datum", "Vrijeme", "Predmet", "Stranke", "Naziv / Vrsta", "Lokacija"]],
+        head: [["Datum", "Vrijeme", "Predmet", "Stranke", "Naziv / Vrsta", "Lokacija / Dvorana", "Sudac"]],
         body: filtrirani.map((r) => {
           const isProc = r.vrstaRoka === "procesni";
           const { lijevo, desno } = getStrankeOrder(rokPredmetView(r.predmet));
-          const stranke = desno.ime ? `${t(lijevo.ime)} vs. ${t(desno.ime)}` : t(lijevo.ime);
+          const stranke = desno.ime ? `${t(lijevo.ime)} c/a ${t(desno.ime)}` : t(lijevo.ime);
+          const lokDvorana = isProc ? "—" : [t(r.lokacija || ""), t(r.dvorana || "")].filter(Boolean).join(" / ") || "—";
           return [
             new Date(r.datum).toLocaleDateString("hr-HR"),
             isProc ? "—" : (r.vrijeme || "—"),
             t(r.predmet.oznaka),
             stranke,
             `${t(r.naziv)} (${t(VRSTA_LABEL[r.vrstaRoka] || r.vrstaRoka)})`,
-            isProc ? "—" : t(r.lokacija || "—"),
+            lokDvorana,
+            isProc ? "—" : t(r.sudacRoka || "—"),
           ];
         }),
-        styles: { fontSize: 8.5, cellPadding: 3.5 },
+        styles: { fontSize: 8, cellPadding: 3 },
         headStyles: { fillColor: [30, 25, 20], textColor: 255, fontStyle: "bold" },
         alternateRowStyles: { fillColor: [250, 248, 244] },
         columnStyles: {
-          0: { cellWidth: 26 },
-          1: { cellWidth: 18 },
-          2: { cellWidth: 28 },
-          3: { cellWidth: 58 },
-          4: { cellWidth: 50 },
-          5: { cellWidth: 50 },
+          0: { cellWidth: 24 },
+          1: { cellWidth: 16 },
+          2: { cellWidth: 24 },
+          3: { cellWidth: 52 },
+          4: { cellWidth: 44 },
+          5: { cellWidth: 44 },
+          6: { cellWidth: 38 },
         },
       });
     }
@@ -257,7 +260,7 @@ export default function RokovnikPage({ onSelectPredmet }) {
                           const { lijevo, desno } = getStrankeOrder(rokPredmetView(r.predmet));
                           return (
                             <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-                              {lijevo.ime}{desno.ime ? ` vs. ${desno.ime}` : ""}
+                              {lijevo.ime}{desno.ime ? ` c/a ${desno.ime}` : ""}
                             </div>
                           );
                         })()}

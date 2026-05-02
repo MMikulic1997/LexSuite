@@ -6,6 +6,13 @@ import RokovnikPage from "./pages/RokovnikPage";
 import KlijentiPage from "./pages/KlijentiPage";
 import KlijentPage from "./pages/KlijentPage";
 import SettingsPage from "./pages/SettingsPage";
+import PregledPage from "./pages/PregledPage";
+import LoginPage from "./pages/LoginPage";
+import ChangePasswordPage from "./pages/ChangePasswordPage";
+
+function parseJwtPayload(token) {
+  try { return JSON.parse(atob(token.split(".")[1])); } catch { return null; }
+}
 
 function IconSun() {
   return (
@@ -32,15 +39,32 @@ function IconMoon() {
 }
 
 export default function App() {
-  const [nav, setNav]                     = useState("klijenti");
+  const [loggedIn, setLoggedIn] = useState(() => !!localStorage.getItem("lexsuite_token"));
+  const isAdmin = (() => {
+    const token = localStorage.getItem("lexsuite_token");
+    return token ? parseJwtPayload(token)?.role === "admin" : false;
+  })();
+  const [nav, setNav]                     = useState("pregled");
   const [selectedId, setSelectedId]       = useState(null);
   const [selectedKlijentId, setSelectedKlijentId] = useState(null);
   const [dark, setDark] = useState(() => localStorage.getItem("lexic-dark") === "true");
+
+  const handleLogin = () => setLoggedIn(true);
+
+  const handleLogout = () => {
+    localStorage.removeItem("lexsuite_token");
+    setLoggedIn(false);
+    setNav("pregled");
+    setSelectedId(null);
+    setSelectedKlijentId(null);
+  };
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
     localStorage.setItem("lexic-dark", dark);
   }, [dark]);
+
+  if (!loggedIn) return <LoginPage onLogin={handleLogin} />;
 
   const handleSelectPredmet = (id) => {
     setSelectedId(id);
@@ -69,6 +93,7 @@ export default function App() {
   };
 
   const handleSettings = () => setNav("settings");
+  const handleChangePassword = () => setNav("change_password");
 
   const navigate = (id) => {
     if (id === "klijenti") { handleBackFromKlijent(); }
@@ -77,12 +102,47 @@ export default function App() {
 
   return (
     <div className="layout">
-      <Sidebar nav={nav} onNavigate={navigate} onSettings={handleSettings} />
+      <Sidebar nav={nav} onNavigate={navigate} onSettings={handleSettings} onChangePassword={handleChangePassword} onLogout={handleLogout} isAdmin={isAdmin} />
 
       <main className="main">
         <div className="topbar">
           <span className="topbar-firm">O.D. Mikulić Nikolić</span>
           <div className="topbar-actions">
+            {/* Notifikacije */}
+            <div style={{ position: "relative", display: "flex" }}>
+              <button className="topbar-icon-btn" title="Notifikacije">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                  <path d="M9 2a5.5 5.5 0 0 0-5.5 5.5c0 2.5-.8 3.8-1.5 4.5h14c-.7-.7-1.5-2-1.5-4.5A5.5 5.5 0 0 0 9 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+                  <path d="M7.5 14.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+              </button>
+              <span style={{
+                position: "absolute", top: 2, right: 2,
+                minWidth: 15, height: 15, borderRadius: 8,
+                background: "var(--red)", color: "#fff",
+                fontSize: 9, fontWeight: 700, lineHeight: "15px", textAlign: "center",
+                padding: "0 3px", pointerEvents: "none",
+                border: "1.5px solid var(--surface)",
+              }}>3</span>
+            </div>
+
+            {/* Poruke */}
+            <div style={{ position: "relative", display: "flex" }}>
+              <button className="topbar-icon-btn" title="Poruke">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                  <path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h11A1.5 1.5 0 0 1 16 3.5v8A1.5 1.5 0 0 1 14.5 13H6l-4 3V3.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <span style={{
+                position: "absolute", top: 2, right: 2,
+                minWidth: 15, height: 15, borderRadius: 8,
+                background: "var(--blue)", color: "#fff",
+                fontSize: 9, fontWeight: 700, lineHeight: "15px", textAlign: "center",
+                padding: "0 3px", pointerEvents: "none",
+                border: "1.5px solid var(--surface)",
+              }}>1</span>
+            </div>
+
             <button className="dark-toggle" onClick={() => setDark(!dark)} title={dark ? "Switch to light mode" : "Switch to dark mode"}>
               {dark ? <IconSun /> : <IconMoon />}
             </button>
@@ -102,7 +162,9 @@ export default function App() {
         </div>
 
         <div className="page-content">
-        {nav === "predmet" && selectedId
+        {nav === "pregled"
+          ? <PregledPage onSelectPredmet={handleSelectPredmet} />
+          : nav === "predmet" && selectedId
           ? <PredmetPage predmetId={selectedId} onBack={handleBackFromPredmet} onSelectKlijent={handleSelectKlijent} />
           : nav === "klijent" && selectedKlijentId
           ? <KlijentPage
@@ -118,7 +180,11 @@ export default function App() {
           ? <SviPredmetiPage onSelectPredmet={handleSelectPredmet} onSelectKlijent={handleSelectKlijent} />
           : nav === "settings"
           ? <SettingsPage />
-          : <KlijentiPage onSelect={handleSelectKlijent} onSelectPredmet={handleSelectPredmet} />
+          : nav === "change_password"
+          ? <ChangePasswordPage onBack={() => setNav("pregled")} />
+          : nav === "klijenti"
+          ? <KlijentiPage onSelect={handleSelectKlijent} onSelectPredmet={handleSelectPredmet} />
+          : <PregledPage onSelectPredmet={handleSelectPredmet} />
         }
         </div>
       </main>

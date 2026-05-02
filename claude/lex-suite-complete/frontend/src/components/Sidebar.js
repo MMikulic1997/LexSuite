@@ -3,6 +3,15 @@ import LexicLogo from "./LexicLogo";
 
 // ── Inline SVG icons (no external dependency) ─────────────────────────────
 
+function IconHome() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path d="M2 8.5L9 2l7 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 7.2V15a.5.5 0 0 0 .5.5h3.25v-3.75h2.5V15.5H13.5A.5.5 0 0 0 14 15V7.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function IconCases() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
@@ -68,6 +77,7 @@ function IconSettings() {
 // ── Nav items config ───────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
+  { id: "pregled",      label: "Pregled",  icon: <IconHome />,     activeIds: ["pregled"] },
   { id: "svi_predmeti", label: "Predmeti", icon: <IconCases />,    activeIds: ["svi_predmeti", "predmet"] },
   { id: "rokovnik",     label: "Rokovnik", icon: <IconCalendar />, activeIds: ["rokovnik"] },
   { id: "klijenti",     label: "Klijenti", icon: <IconClients />,  activeIds: ["klijenti", "klijent"] },
@@ -75,7 +85,27 @@ const NAV_ITEMS = [
 
 // ── Sidebar component ──────────────────────────────────────────────────────
 
-export default function Sidebar({ nav, onNavigate, onSettings }) {
+function IconLock() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <rect x="3" y="8" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M6 8V5.5a3 3 0 0 1 6 0V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="9" cy="12" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function IconLogout() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path d="M7 3H3.5A1.5 1.5 0 0 0 2 4.5v9A1.5 1.5 0 0 0 3.5 15H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M12 5.5l4 3.5-4 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="7" y1="9" x2="16" y2="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export default function Sidebar({ nav, onNavigate, onSettings, onChangePassword, onLogout, isAdmin }) {
   const [collapsed, setCollapsed] = useState(false);
 
   const W_EXPANDED  = 220;
@@ -311,8 +341,8 @@ export default function Sidebar({ nav, onNavigate, onSettings }) {
           overflow: "hidden",
         }}
       >
-        {/* Settings button */}
-        <button
+        {/* Settings button — admin only */}
+        {isAdmin && <button
           onClick={onSettings}
           title={collapsed ? "Postavke" : undefined}
           style={{
@@ -371,6 +401,109 @@ export default function Sidebar({ nav, onNavigate, onSettings }) {
             }}
           >
             Postavke
+          </span>
+        </button>}
+
+        {/* Promjena lozinke */}
+        <button
+          onClick={onChangePassword}
+          title={collapsed ? "Promijeni lozinku" : undefined}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: collapsed ? "center" : "flex-start",
+            gap: collapsed ? 0 : 10,
+            width: "100%",
+            padding: collapsed ? "13px 0" : "12px 20px",
+            background: nav === "change_password" ? "var(--sidebar-active)" : "none",
+            border: "none",
+            borderLeft: `2px solid ${nav === "change_password" ? "var(--gold-light)" : "transparent"}`,
+            cursor: "pointer",
+            color: nav === "change_password" ? "#FFFFFF" : "rgba(255,255,255,.48)",
+            fontFamily: "var(--font-body)",
+            fontSize: 13.5,
+            fontWeight: nav === "change_password" ? 500 : 400,
+            textAlign: "left",
+            transition: "all .15s",
+            whiteSpace: "nowrap",
+          }}
+          onMouseEnter={(e) => {
+            if (nav !== "change_password") {
+              e.currentTarget.style.background = "var(--sidebar-hover)";
+              e.currentTarget.style.color = "rgba(255,255,255,.82)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (nav !== "change_password") {
+              e.currentTarget.style.background = "none";
+              e.currentTarget.style.color = "rgba(255,255,255,.48)";
+            }
+          }}
+        >
+          <span style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 20, flexShrink: 0,
+            color: nav === "change_password" ? "var(--gold-light)" : "currentColor",
+            transition: "color .15s",
+          }}>
+            <IconLock />
+          </span>
+          <span style={{
+            overflow: "hidden",
+            maxWidth: collapsed ? 0 : 160,
+            opacity: collapsed ? 0 : 1,
+            transition: "max-width 0.22s cubic-bezier(0.4,0,0.2,1), opacity 0.12s ease",
+            whiteSpace: "nowrap",
+            display: "block",
+          }}>
+            Promijeni lozinku
+          </span>
+        </button>
+
+        {/* Odjava */}
+        <button
+          onClick={onLogout}
+          title={collapsed ? "Odjava" : undefined}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: collapsed ? "center" : "flex-start",
+            gap: collapsed ? 0 : 10,
+            width: "100%",
+            padding: collapsed ? "13px 0" : "12px 20px",
+            background: "none",
+            border: "none",
+            borderLeft: "2px solid transparent",
+            cursor: "pointer",
+            color: "rgba(255,255,255,.48)",
+            fontFamily: "var(--font-body)",
+            fontSize: 13.5,
+            fontWeight: 400,
+            textAlign: "left",
+            transition: "all .15s",
+            whiteSpace: "nowrap",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(185,28,28,.12)";
+            e.currentTarget.style.color = "#FCA5A5";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "none";
+            e.currentTarget.style.color = "rgba(255,255,255,.48)";
+          }}
+        >
+          <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 20, flexShrink: 0 }}>
+            <IconLogout />
+          </span>
+          <span style={{
+            overflow: "hidden",
+            maxWidth: collapsed ? 0 : 160,
+            opacity: collapsed ? 0 : 1,
+            transition: "max-width 0.22s cubic-bezier(0.4,0,0.2,1), opacity 0.12s ease",
+            whiteSpace: "nowrap",
+            display: "block",
+          }}>
+            Odjava
           </span>
         </button>
 

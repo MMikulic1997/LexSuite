@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { api } from "../utils/api";
+import { apiFetch } from "../api";
 import DatumBox from "../components/DatumBox";
 import { getStrankeOrder } from "../utils/strankeUtils";
 
@@ -161,7 +162,7 @@ function Naslovnica({ predmet, onUpdate, onSelectKlijent }) {
 
 // ── Rokovnik ────────────────────────────────────────────────────────────────────
 const VRSTA_LABEL = { rociste: "Ročište", sastanak: "Sastanak", ostalo: "Ostalo" };
-const EMPTY_ROK_FORM = { vrstaRoka: "rociste", naziv: "", datum: "", vrijeme: "", lokacija: "", napomena: "" };
+const EMPTY_ROK_FORM = { vrstaRoka: "rociste", naziv: "", datum: "", vrijeme: "", lokacija: "", sudacRoka: "", dvorana: "", napomena: "", zaduzenaOsoba: "" };
 
 function Rokovnik({ predmet, onRefresh }) {
   const [modal, setModal]     = useState(false);
@@ -169,7 +170,15 @@ function Rokovnik({ predmet, onRefresh }) {
   const [tipRoka, setTipRoka] = useState(null);      // null | "rociste_sastanak" | "procesni"
   const [form, setForm]       = useState(EMPTY_ROK_FORM);
   const [error, setError]     = useState("");
+  const [members, setMembers] = useState([]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    apiFetch("/api/office/members")
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setMembers(data); })
+      .catch(() => {});
+  }, []);
 
   const openAdd = () => {
     setEditRok(null); setTipRoka(null); setForm(EMPTY_ROK_FORM); setError(""); setModal(true);
@@ -180,12 +189,15 @@ function Rokovnik({ predmet, onRefresh }) {
     setEditRok(rok);
     setTipRoka(isProc ? "procesni" : "rociste_sastanak");
     setForm({
-      vrstaRoka: rok.vrstaRoka,
-      naziv:     rok.naziv,
-      datum:     rok.datum ? rok.datum.slice(0, 10) : "",
-      vrijeme:   rok.vrijeme  || "",
-      lokacija:  rok.lokacija || "",
-      napomena:  rok.napomena || "",
+      vrstaRoka:     rok.vrstaRoka,
+      naziv:         rok.naziv,
+      datum:         rok.datum ? rok.datum.slice(0, 10) : "",
+      vrijeme:       rok.vrijeme       || "",
+      lokacija:      rok.lokacija      || "",
+      sudacRoka:     rok.sudacRoka     || "",
+      dvorana:       rok.dvorana       || "",
+      napomena:      rok.napomena      || "",
+      zaduzenaOsoba: rok.zaduzenaOsoba || "",
     });
     setError(""); setModal(true);
   };
@@ -199,13 +211,17 @@ function Rokovnik({ predmet, onRefresh }) {
     if (tipRoka === "procesni" && !form.naziv.trim()) { setError("Naziv roka je obavezan."); return; }
     setError("");
     const isProc = tipRoka === "procesni";
+    const isRociste = !isProc && form.vrstaRoka === "rociste";
     const payload = {
-      vrstaRoka: isProc ? "procesni" : form.vrstaRoka,
-      naziv:     isProc ? form.naziv.trim() : VRSTA_LABEL[form.vrstaRoka],
-      datum:     form.datum,
-      vrijeme:   isProc ? "" : form.vrijeme,
-      lokacija:  isProc ? "" : form.lokacija,
-      napomena:  form.napomena,
+      vrstaRoka:     isProc ? "procesni" : form.vrstaRoka,
+      naziv:         isProc ? form.naziv.trim() : VRSTA_LABEL[form.vrstaRoka],
+      datum:         form.datum,
+      vrijeme:       isProc ? "" : form.vrijeme,
+      lokacija:      isProc ? "" : form.lokacija,
+      sudacRoka:     isRociste ? form.sudacRoka : "",
+      dvorana:       isRociste ? form.dvorana   : "",
+      napomena:      form.napomena,
+      zaduzenaOsoba: form.zaduzenaOsoba,
     };
     if (editRok) {
       await api.updateRok(predmet.id, editRok.id, payload);
@@ -246,14 +262,27 @@ function Rokovnik({ predmet, onRefresh }) {
               {isProc ? "Procesni rok" : (VRSTA_LABEL[rok.vrstaRoka] || "Ostalo")}
             </span>
           </div>
-          {!isProc && (rok.vrijeme || rok.lokacija) && (
+          {!isProc && (rok.vrijeme || rok.lokacija || rok.dvorana || rok.sudacRoka) && (
             <div className="rok-napomena">
-              {rok.vrijeme && <span>🕐 {rok.vrijeme}</span>}
-              {rok.vrijeme && rok.lokacija && <span style={{ margin: "0 6px", opacity: .4 }}>·</span>}
-              {rok.lokacija && <span>📍 {rok.lokacija}</span>}
+              {[
+                rok.vrijeme   && `🕐 ${rok.vrijeme}`,
+                rok.lokacija  && `📍 ${rok.lokacija}`,
+                rok.dvorana   && `🚪 ${rok.dvorana}`,
+                rok.sudacRoka && `⚖️ ${rok.sudacRoka}`,
+              ].filter(Boolean).map((item, i, arr) => (
+                <React.Fragment key={i}>
+                  <span>{item}</span>
+                  {i < arr.length - 1 && <span style={{ margin: "0 6px", opacity: .4 }}>·</span>}
+                </React.Fragment>
+              ))}
             </div>
           )}
           {rok.napomena && <div className="rok-napomena">{rok.napomena}</div>}
+          {rok.zaduzenaOsoba && (
+            <div className="rok-napomena">
+              👤 {members.find((m) => m.id === rok.zaduzenaOsoba)?.name || rok.zaduzenaOsoba}
+            </div>
+          )}
         </div>
         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
           <button className="btn btn-sm btn-ghost" onClick={() => openEdit(rok)} title="Uredi rok">✏</button>
@@ -364,8 +393,20 @@ function Rokovnik({ predmet, onRefresh }) {
                       </div>
                       <div className="form-group">
                         <label>Lokacija</label>
-                        <input placeholder="npr. Općinski sud Zagreb, sala 5" value={form.lokacija} onChange={(e) => set("lokacija", e.target.value)} />
+                        <input placeholder="npr. Općinski sud Zagreb" value={form.lokacija} onChange={(e) => set("lokacija", e.target.value)} />
                       </div>
+                      {form.vrstaRoka === "rociste" && (
+                        <>
+                          <div className="form-group">
+                            <label>Sudac</label>
+                            <input placeholder="Ime i prezime suca" value={form.sudacRoka} onChange={(e) => set("sudacRoka", e.target.value)} />
+                          </div>
+                          <div className="form-group">
+                            <label>Dvorana / Ured</label>
+                            <input placeholder="npr. Sala 5" value={form.dvorana} onChange={(e) => set("dvorana", e.target.value)} />
+                          </div>
+                        </>
+                      )}
                     </>
                   ) : (
                     <>
@@ -385,6 +426,15 @@ function Rokovnik({ predmet, onRefresh }) {
                     </>
                   )}
 
+                  <div className="form-group">
+                    <label>Zadužena osoba</label>
+                    <select value={form.zaduzenaOsoba} onChange={(e) => set("zaduzenaOsoba", e.target.value)}>
+                      <option value="">— Nije dodijeljeno —</option>
+                      {members.map((m) => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="form-group full">
                     <label>Napomena</label>
                     <textarea placeholder="Dodatne informacije..." value={form.napomena} onChange={(e) => set("napomena", e.target.value)} />
@@ -455,7 +505,7 @@ function Dokumenti({ predmet, onRefresh }) {
   };
 
   const fetchBlob = async (dokId) => {
-    const res = await fetch(api.getFajlUrl(predmet.id, dokId));
+    const res = await apiFetch(api.getFajlUrl(predmet.id, dokId));
     if (!res.ok) throw new Error("Fajl nije dostupan");
     return { blob: await res.blob(), type: res.headers.get("Content-Type") || "" };
   };
@@ -633,17 +683,42 @@ const STATUS_NEXT_LABEL = {
   zavrseno:    "Završeno",
 };
 
+function parseJwt(token) {
+  try { return JSON.parse(atob(token.split(".")[1])); } catch { return {}; }
+}
+
 function Zadaci({ predmet, onRefresh }) {
   const [modal, setModal] = useState(false);
   const [form, setForm]   = useState({ naziv: "", opis: "", rok: "", zaduzenaOsoba: "", prioritet: "srednji" });
+  const [dodajURokovnik, setDodajURokovnik] = useState(false);
   const [error, setError] = useState("");
+  const [members, setMembers] = useState([]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const { userId: currentUserId, role: currentRole } = parseJwt(localStorage.getItem("lexsuite_token") || "");
+  const membersMap = Object.fromEntries(members.map((m) => [m.id, m.name]));
+
+  useEffect(() => {
+    apiFetch("/api/office/members")
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setMembers(data); })
+      .catch(() => {});
+  }, []);
 
   const add = async () => {
     if (!form.naziv.trim()) { setError("Naziv je obavezan."); return; }
     setError("");
     await api.createZadatak(predmet.id, form);
+    if (dodajURokovnik && form.rok) {
+      await api.createRok(predmet.id, {
+        vrstaRoka: "procesni",
+        naziv: form.naziv.trim(),
+        datum: form.rok,
+        vrijeme: "", lokacija: "", sudacRoka: "", dvorana: "", napomena: "",
+      });
+    }
     setForm({ naziv: "", opis: "", rok: "", zaduzenaOsoba: "", prioritet: "srednji" });
+    setDodajURokovnik(false);
     setModal(false);
     onRefresh();
   };
@@ -705,21 +780,27 @@ function Zadaci({ predmet, onRefresh }) {
                             {pr.label}
                           </span>
                           {z.rok && <span style={{ fontSize: 12, color: "var(--ink-3)" }}>📅 {formatRok(z.rok)}</span>}
-                          {z.zaduzenaOsoba && <span style={{ fontSize: 12, color: "var(--ink-3)" }}>👤 {z.zaduzenaOsoba}</span>}
+                          {z.zaduzenaOsoba && <span style={{ fontSize: 12, color: "var(--ink-3)" }}>👤 {membersMap[z.zaduzenaOsoba] || z.zaduzenaOsoba}</span>}
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
-                        <select
-                          value={z.status}
-                          onChange={(e) => changeStatus(z, e.target.value)}
-                          style={{ fontSize: 12, padding: "5px 8px", border: "1px solid var(--border)", borderRadius: 4, background: "var(--surface)", cursor: "pointer", color: "var(--ink-2)" }}
-                        >
-                          {Object.entries(STATUS_NEXT_LABEL).map(([k, v]) => (
-                            <option key={k} value={k}>{v}</option>
-                          ))}
-                        </select>
-                        <button className="btn btn-sm btn-danger" onClick={() => del(z.id)}>×</button>
-                      </div>
+                      {(() => {
+                          const canEdit = currentRole === "admin" || currentUserId === z.zaduzenaOsoba;
+                          return (
+                            <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
+                              <select
+                                value={z.status}
+                                onChange={(e) => changeStatus(z, e.target.value)}
+                                disabled={!canEdit}
+                                style={{ fontSize: 12, padding: "5px 8px", border: "1px solid var(--border)", borderRadius: 4, background: canEdit ? "var(--surface)" : "var(--surface-3)", cursor: canEdit ? "pointer" : "not-allowed", color: canEdit ? "var(--ink-2)" : "var(--ink-4)", opacity: canEdit ? 1 : 0.6 }}
+                              >
+                                {Object.entries(STATUS_NEXT_LABEL).map(([k, v]) => (
+                                  <option key={k} value={k}>{v}</option>
+                                ))}
+                              </select>
+                              <button className="btn btn-sm btn-danger" onClick={() => del(z.id)}>×</button>
+                            </div>
+                          );
+                        })()}
                     </div>
                   );
                 })}
@@ -734,7 +815,7 @@ function Zadaci({ predmet, onRefresh }) {
           <div className="modal">
             <div className="modal-header">
               <span className="modal-title">Novi zadatak</span>
-              <button className="btn-close" onClick={() => { setModal(false); setError(""); }}>×</button>
+              <button className="btn-close" onClick={() => { setModal(false); setError(""); setDodajURokovnik(false); }}>×</button>
             </div>
             <div className="modal-body">
               {error && <div style={{ color: "var(--red)", marginBottom: 16, fontSize: 13 }}>⚠ {error}</div>}
@@ -749,11 +830,34 @@ function Zadaci({ predmet, onRefresh }) {
                 </div>
                 <div className="form-group">
                   <label>Rok (opcionalno)</label>
-                  <input type="date" value={form.rok} onChange={(e) => set("rok", e.target.value)} />
+                  <input type="date" value={form.rok} onChange={(e) => { set("rok", e.target.value); if (!e.target.value) setDodajURokovnik(false); }} />
+                </div>
+                <div className="form-group" style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 22 }}>
+                  <span title={!form.rok ? "Unesite rok za dodavanje u rokovnik" : ""} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      type="checkbox"
+                      id="dodaj-rokovnik-chk"
+                      checked={dodajURokovnik}
+                      disabled={!form.rok}
+                      onChange={(e) => setDodajURokovnik(e.target.checked)}
+                      style={{ width: 16, height: 16, cursor: form.rok ? "pointer" : "not-allowed" }}
+                    />
+                    <label
+                      htmlFor="dodaj-rokovnik-chk"
+                      style={{ fontWeight: 400, fontSize: 13, cursor: form.rok ? "pointer" : "not-allowed", marginBottom: 0, color: form.rok ? "var(--ink)" : "var(--ink-3)" }}
+                    >
+                      Dodaj u rokovnik kao procesni rok
+                    </label>
+                  </span>
                 </div>
                 <div className="form-group">
                   <label>Zadužena osoba</label>
-                  <input placeholder="Ime odvjetnika ili suradnika" value={form.zaduzenaOsoba} onChange={(e) => set("zaduzenaOsoba", e.target.value)} />
+                  <select value={form.zaduzenaOsoba} onChange={(e) => set("zaduzenaOsoba", e.target.value)}>
+                    <option value="">— Nije dodijeljeno —</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label>Prioritet</label>
@@ -766,7 +870,7 @@ function Zadaci({ predmet, onRefresh }) {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => { setModal(false); setError(""); }}>Odustani</button>
+              <button className="btn btn-ghost" onClick={() => { setModal(false); setError(""); setDodajURokovnik(false); }}>Odustani</button>
               <button className="btn btn-primary" onClick={add}>Dodaj zadatak</button>
             </div>
           </div>
@@ -1157,7 +1261,7 @@ export default function PredmetPage({ predmetId, onBack, onSelectKlijent }) {
                 {lijevo.uloga && <span style={roleStyle}>· {lijevo.uloga}</span>}
                 {desno.ime && (
                   <>
-                    <span style={{ color: "rgba(255,255,255,.4)", margin: "0 10px" }}>vs.</span>
+                    <span style={{ color: "rgba(255,255,255,.4)", margin: "0 10px" }}>c/a</span>
                     <strong>{desno.ime}</strong>
                     {desno.uloga && <span style={roleStyle}>· {desno.uloga}</span>}
                   </>

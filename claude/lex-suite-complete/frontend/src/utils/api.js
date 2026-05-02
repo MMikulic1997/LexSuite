@@ -1,11 +1,37 @@
+import { apiFetch } from "../api";
+
 const BASE = "/api";
 
+function getToken() {
+  return localStorage.getItem("lexsuite_token");
+}
+
+function handleUnauthorized() {
+  localStorage.removeItem("lexsuite_token");
+  window.location.reload();
+}
+
 async function req(method, path, body) {
-  const res = await fetch(BASE + path, {
+  const token = getToken();
+  if (!token) {
+    handleUnauthorized();
+    return;
+  }
+
+  const res = await apiFetch(BASE + path, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
+
+  if (res.status === 401) {
+    handleUnauthorized();
+    return;
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || "Greška na serveru");
@@ -14,6 +40,9 @@ async function req(method, path, body) {
 }
 
 export const api = {
+  // Pregled
+  getPregled: () => req("GET", "/pregled"),
+
   // Predmeti
   getPredmeti: () => req("GET", "/predmeti"),
   getPredmet: (id) => req("GET", `/predmeti/${id}`),
@@ -36,12 +65,22 @@ export const api = {
   deleteDokument: (predmetId, dokId) => req("DELETE", `/predmeti/${predmetId}/dokumenti/${dokId}`),
 
   uploadDokument: async (predmetId, fajl, meta = {}) => {
+    const token = getToken();
+    if (!token) { handleUnauthorized(); return; }
+
     const fd = new FormData();
     fd.append("fajl", fajl);
     if (meta.naziv) fd.append("naziv", meta.naziv);
     if (meta.vrsta) fd.append("vrsta", meta.vrsta);
     if (meta.opis)  fd.append("opis",  meta.opis);
-    const res = await fetch(`${BASE}/predmeti/${predmetId}/dokumenti/upload`, { method: "POST", body: fd });
+
+    const res = await apiFetch(`${BASE}/predmeti/${predmetId}/dokumenti/upload`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}` },
+      body: fd,
+    });
+
+    if (res.status === 401) { handleUnauthorized(); return; }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || "Greška pri uploadu");
