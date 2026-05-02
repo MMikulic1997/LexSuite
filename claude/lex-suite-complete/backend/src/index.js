@@ -103,6 +103,30 @@ app.post("/api/auth/login", async (req, res) => {
   return res.json({ token });
 });
 
+// ── Registracija novog ureda (superadmin) ─────────────────────────────────────
+app.post("/api/auth/register", async (req, res) => {
+  const { imeUreda, email, password } = req.body;
+  if (!imeUreda || !email || !password) {
+    return res.status(400).json({ error: "Sva polja su obavezna." });
+  }
+  const normalEmail = email.trim().toLowerCase();
+  if (db.prepare("SELECT id FROM users WHERE email = ?").get(normalEmail)) {
+    return res.status(409).json({ error: "Korisnik s tim emailom već postoji." });
+  }
+  const officeId = uuidv4();
+  const userId   = uuidv4();
+  const hash     = await bcrypt.hash(password, 10);
+  db.prepare(
+    "INSERT INTO users (id, office_id, name, email, password_hash, role, is_active, is_owner, created_at) VALUES (?, ?, ?, ?, ?, 'superadmin', 1, 1, ?)"
+  ).run(userId, officeId, imeUreda.trim(), normalEmail, hash, new Date().toISOString());
+  const token = jwt.sign(
+    { userId, email: normalEmail, role: "superadmin", officeId },
+    JWT_SECRET,
+    { expiresIn: "8h" }
+  );
+  return res.json({ token });
+});
+
 // ── Zaštita svih ostalih /api/ ruta ───────────────────────────────────────────
 app.use("/api", authMiddleware);
 
@@ -514,7 +538,7 @@ app.patch("/api/predmeti/:id/zadaci/:zadatakId", (req, res) => {
     return res.status(403).json({ error: "Pristup nije dozvoljen." });
   const z = db.prepare("SELECT * FROM zadaci WHERE id = ? AND predmet_id = ?").get(req.params.zadatakId, req.params.id);
   if (!z) return res.status(404).json({ error: "Zadatak nije pronađen" });
-  if (req.user.role !== "admin" && req.user.userId !== z.zaduzena_osoba)
+  if (req.user.role !== "admin" && req.user.role !== "superadmin" && req.user.userId !== z.zaduzena_osoba)
     return res.status(403).json({ error: "Nemate ovlasti mijenjati ovaj zadatak." });
   const naziv         = req.body.naziv         !== undefined ? req.body.naziv.trim()  : z.naziv;
   const opis          = req.body.opis          !== undefined ? req.body.opis          : z.opis;
@@ -665,7 +689,7 @@ app.delete("/api/klijenti/:id", (req, res) => {
 
 // ── Users (admin only) ─────────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
-  if (req.user?.role !== "admin") {
+  if (req.user?.role !== "admin" && req.user?.role !== "superadmin") {
     return res.status(403).json({ error: "Samo admin može upravljati korisnicima." });
   }
   next();
