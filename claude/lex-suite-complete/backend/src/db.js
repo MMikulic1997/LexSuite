@@ -14,29 +14,55 @@ db.exec(`
     value INTEGER NOT NULL DEFAULT 0
   );
 
+  CREATE TABLE IF NOT EXISTS users (
+    id            TEXT PRIMARY KEY,
+    office_id     TEXT NOT NULL DEFAULT '',
+    name          TEXT NOT NULL DEFAULT '',
+    email         TEXT NOT NULL,
+    password_hash TEXT NOT NULL DEFAULT '',
+    role          TEXT NOT NULL DEFAULT 'user',
+    is_active     INTEGER NOT NULL DEFAULT 1,
+    is_owner      INTEGER NOT NULL DEFAULT 0,
+    created_at    TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS predmeti (
     id               TEXT PRIMARY KEY,
+    office_id        TEXT NOT NULL DEFAULT '',
     oznaka           TEXT NOT NULL,
     vrsta            TEXT NOT NULL,
+    naziv_predmeta   TEXT NOT NULL DEFAULT '',
     stranka_ime      TEXT NOT NULL DEFAULT '',
     stranka_oib      TEXT NOT NULL DEFAULT '',
     stranka_uloga    TEXT NOT NULL DEFAULT 'Tužitelj',
     protustranka_ime TEXT NOT NULL DEFAULT '',
     protustranka_oib TEXT NOT NULL DEFAULT '',
+    poslovni_broj    TEXT NOT NULL DEFAULT '',
+    vps              TEXT NOT NULL DEFAULT '',
+    klijent_id       TEXT,
     sud              TEXT NOT NULL DEFAULT '',
     sudac            TEXT NOT NULL DEFAULT '',
     opis             TEXT NOT NULL DEFAULT '',
+    uloga_klijenta   TEXT NOT NULL DEFAULT 'Tužitelj',
+    strana_umjesaca  TEXT NOT NULL DEFAULT 'tuzitelj',
     status           TEXT NOT NULL DEFAULT 'aktivan',
     datum_otvaranja  TEXT NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS rokovi (
-    id         TEXT PRIMARY KEY,
-    predmet_id TEXT NOT NULL REFERENCES predmeti(id) ON DELETE CASCADE,
-    naziv      TEXT NOT NULL,
-    datum      TEXT NOT NULL,
-    napomena   TEXT NOT NULL DEFAULT '',
-    dovrseno   INTEGER NOT NULL DEFAULT 0
+    id             TEXT PRIMARY KEY,
+    predmet_id     TEXT NOT NULL REFERENCES predmeti(id) ON DELETE CASCADE,
+    naziv          TEXT NOT NULL,
+    datum          TEXT NOT NULL,
+    napomena       TEXT NOT NULL DEFAULT '',
+    dovrseno       INTEGER NOT NULL DEFAULT 0,
+    tip_pristupa   TEXT NOT NULL DEFAULT 'opci',
+    vrsta_roka     TEXT NOT NULL DEFAULT 'ostalo',
+    vrijeme        TEXT NOT NULL DEFAULT '',
+    lokacija       TEXT NOT NULL DEFAULT '',
+    sudac_roka     TEXT NOT NULL DEFAULT '',
+    dvorana        TEXT NOT NULL DEFAULT '',
+    zaduzena_osoba TEXT NOT NULL DEFAULT ''
   );
 
   CREATE TABLE IF NOT EXISTS dokumenti (
@@ -45,7 +71,10 @@ db.exec(`
     naziv           TEXT NOT NULL,
     vrsta           TEXT NOT NULL DEFAULT 'ostalo',
     opis            TEXT NOT NULL DEFAULT '',
-    datum_dodavanja TEXT NOT NULL
+    datum_dodavanja TEXT NOT NULL,
+    putanja         TEXT NOT NULL DEFAULT '',
+    velicina        INTEGER NOT NULL DEFAULT 0,
+    mime_tip        TEXT NOT NULL DEFAULT ''
   );
 
   CREATE TABLE IF NOT EXISTS tijek (
@@ -58,6 +87,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS klijenti (
     id         TEXT PRIMARY KEY,
+    office_id  TEXT NOT NULL DEFAULT '',
     naziv      TEXT NOT NULL,
     oib        TEXT NOT NULL DEFAULT '',
     tip        TEXT NOT NULL DEFAULT 'fizicka',
@@ -93,6 +123,14 @@ db.exec(`
 `);
 
 // ── Migracije ──────────────────────────────────────────────────────────────────
+// office_id na predmeti i klijenti (za stare baze bez tih kolona)
+{
+  const pc = db.prepare("PRAGMA table_info(predmeti)").all().map((c) => c.name);
+  if (!pc.includes("office_id")) db.exec("ALTER TABLE predmeti ADD COLUMN office_id TEXT NOT NULL DEFAULT ''");
+  const kc = db.prepare("PRAGMA table_info(klijenti)").all().map((c) => c.name);
+  if (!kc.includes("office_id")) db.exec("ALTER TABLE klijenti ADD COLUMN office_id TEXT NOT NULL DEFAULT ''");
+}
+
 let predCols = db.prepare("PRAGMA table_info(predmeti)").all().map((c) => c.name);
 if (!predCols.includes("poslovni_broj"))   db.exec("ALTER TABLE predmeti ADD COLUMN poslovni_broj   TEXT NOT NULL DEFAULT ''");
 if (!predCols.includes("klijent_id"))      db.exec("ALTER TABLE predmeti ADD COLUMN klijent_id      TEXT");
