@@ -689,8 +689,7 @@ function parseJwt(token) {
 
 function Zadaci({ predmet, onRefresh }) {
   const [modal, setModal] = useState(false);
-  const [form, setForm]   = useState({ naziv: "", opis: "", rok: "", zaduzenaOsoba: "", prioritet: "srednji" });
-  const [dodajURokovnik, setDodajURokovnik] = useState(false);
+  const [form, setForm]   = useState({ naziv: "", opis: "", rok: "", zaduzenaOsoba: "", prioritet: "srednji", procesniRok: false });
   const [error, setError] = useState("");
   const [members, setMembers] = useState([]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -709,16 +708,7 @@ function Zadaci({ predmet, onRefresh }) {
     if (!form.naziv.trim()) { setError("Naziv je obavezan."); return; }
     setError("");
     await api.createZadatak(predmet.id, form);
-    if (dodajURokovnik && form.rok) {
-      await api.createRok(predmet.id, {
-        vrstaRoka: "procesni",
-        naziv: form.naziv.trim(),
-        datum: form.rok,
-        vrijeme: "", lokacija: "", sudacRoka: "", dvorana: "", napomena: "",
-      });
-    }
-    setForm({ naziv: "", opis: "", rok: "", zaduzenaOsoba: "", prioritet: "srednji" });
-    setDodajURokovnik(false);
+    setForm({ naziv: "", opis: "", rok: "", zaduzenaOsoba: "", prioritet: "srednji", procesniRok: false });
     setModal(false);
     onRefresh();
   };
@@ -837,16 +827,16 @@ function Zadaci({ predmet, onRefresh }) {
                     <input
                       type="checkbox"
                       id="dodaj-rokovnik-chk"
-                      checked={dodajURokovnik}
+                      checked={form.procesniRok}
                       disabled={!form.rok}
-                      onChange={(e) => setDodajURokovnik(e.target.checked)}
+                      onChange={(e) => set("procesniRok", e.target.checked)}
                       style={{ width: 16, height: 16, cursor: form.rok ? "pointer" : "not-allowed" }}
                     />
                     <label
                       htmlFor="dodaj-rokovnik-chk"
                       style={{ fontWeight: 400, fontSize: 13, cursor: form.rok ? "pointer" : "not-allowed", marginBottom: 0, color: form.rok ? "var(--ink)" : "var(--ink-3)" }}
                     >
-                      Dodaj u rokovnik kao procesni rok
+                      Procesni rok (prikaži u rokovniku)
                     </label>
                   </span>
                 </div>
@@ -870,7 +860,7 @@ function Zadaci({ predmet, onRefresh }) {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => { setModal(false); setError(""); setDodajURokovnik(false); }}>Odustani</button>
+              <button className="btn btn-ghost" onClick={() => { setModal(false); setError(""); }}>Odustani</button>
               <button className="btn btn-primary" onClick={add}>Dodaj zadatak</button>
             </div>
           </div>

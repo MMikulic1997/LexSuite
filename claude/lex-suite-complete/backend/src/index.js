@@ -59,6 +59,12 @@ app.use(express.json());
     db.exec("ALTER TABLE rokovi ADD COLUMN zaduzena_osoba TEXT NOT NULL DEFAULT ''");
     console.log("  + zaduzena_osoba dodana u tablicu rokovi");
   }
+  // Dodaj procesni_rok u zadaci (idempotentno)
+  const zadaciCols = db.prepare("PRAGMA table_info(zadaci)").all().map((c) => c.name);
+  if (!zadaciCols.includes("procesni_rok")) {
+    db.exec("ALTER TABLE zadaci ADD COLUMN procesni_rok INTEGER NOT NULL DEFAULT 0");
+    console.log("  + procesni_rok kolona dodana u tablicu zadaci");
+  }
 
   db.prepare(`
     UPDATE users SET is_owner = 1
@@ -205,6 +211,7 @@ function rowToZadatak(z) {
     zaduzenaOsoba: z.zaduzena_osoba  || "",
     prioritet:     z.prioritet       || "srednji",
     status:        z.status          || "nije_poceto",
+    procesniRok:   z.procesni_rok    === 1,
     createdAt:     z.created_at,
   };
 }
@@ -385,14 +392,30 @@ app.get("/api/pregled", (req, res) => {
 // ── Globalni rokovnik ──────────────────────────────────────────────────────────
 app.get("/api/rokovi", (req, res) => {
   const rows = db.prepare(`
-    SELECT r.*, p.oznaka, p.stranka_ime, p.stranka_uloga, p.protustranka_ime, p.strana_umjesaca
+    SELECT r.id, r.predmet_id, r.naziv, r.datum, r.napomena, r.dovrseno,
+           r.vrsta_roka, r.vrijeme, r.lokacija, r.sudac_roka, r.dvorana,
+           r.zaduzena_osoba, 'rok' AS _source,
+           p.oznaka, p.stranka_ime, p.stranka_uloga, p.protustranka_ime, p.strana_umjesaca
     FROM rokovi r
     JOIN predmeti p ON p.id = r.predmet_id
     WHERE p.office_id = ?
-    ORDER BY r.datum ASC
-  `).all(req.user.officeId);
+
+    UNION ALL
+
+    SELECT z.id, z.predmet_id, z.naziv, z.rok AS datum, z.opis AS napomena,
+           CASE WHEN z.status = 'zavrseno' THEN 1 ELSE 0 END AS dovrseno,
+           'procesni' AS vrsta_roka, '' AS vrijeme, '' AS lokacija, '' AS sudac_roka, '' AS dvorana,
+           z.zaduzena_osoba, 'zadatak' AS _source,
+           p.oznaka, p.stranka_ime, p.stranka_uloga, p.protustranka_ime, p.strana_umjesaca
+    FROM zadaci z
+    JOIN predmeti p ON p.id = z.predmet_id
+    WHERE p.office_id = ? AND z.procesni_rok = 1 AND z.rok != ''
+
+    ORDER BY datum ASC
+  `).all(req.user.officeId, req.user.officeId);
   res.json(rows.map((r) => ({
     ...rowToRok(r),
+    source: r._source,
     predmet: { id: r.predmet_id, oznaka: r.oznaka, strankaIme: r.stranka_ime, strankaUloga: r.stranka_uloga, protustrankaIme: r.protustranka_ime, stranaUmjesaca: r.strana_umjesaca || "tuzitelj" },
   })));
 });
@@ -522,14 +545,14 @@ app.get("/api/predmeti/:id/zadaci", (req, res) => {
 app.post("/api/predmeti/:id/zadaci", (req, res) => {
   if (!db.prepare("SELECT id FROM predmeti WHERE id = ? AND office_id = ?").get(req.params.id, req.user.officeId))
     return res.status(403).json({ error: "Pristup nije dozvoljen." });
-  const { naziv, opis, rok, zaduzenaOsoba, prioritet } = req.body;
+  const { naziv, opis, rok, zaduzenaOsoba, prioritet, procesniRok } = req.body;
   if (!naziv?.trim()) return res.status(400).json({ error: "Naziv je obavezan" });
   const id = uuidv4();
   const createdAt = new Date().toISOString();
   db.prepare(`
-    INSERT INTO zadaci (id, predmet_id, naziv, opis, rok, zaduzena_osoba, prioritet, status, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'nije_poceto', ?)
-  `).run(id, req.params.id, naziv.trim(), opis || "", rok || "", zaduzenaOsoba || "", prioritet || "srednji", createdAt);
+    INSERT INTO zadaci (id, predmet_id, naziv, opis, rok, zaduzena_osoba, prioritet, status, procesni_rok, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'nije_poceto', ?, ?)
+  `).run(id, req.params.id, naziv.trim(), opis || "", rok || "", zaduzenaOsoba || "", prioritet || "srednji", procesniRok ? 1 : 0, createdAt);
   res.status(201).json(rowToZadatak(db.prepare("SELECT * FROM zadaci WHERE id = ?").get(id)));
 });
 
@@ -540,14 +563,15 @@ app.patch("/api/predmeti/:id/zadaci/:zadatakId", (req, res) => {
   if (!z) return res.status(404).json({ error: "Zadatak nije pronađen" });
   if (req.user.role !== "admin" && req.user.role !== "superadmin" && req.user.userId !== z.zaduzena_osoba)
     return res.status(403).json({ error: "Nemate ovlasti mijenjati ovaj zadatak." });
-  const naziv         = req.body.naziv         !== undefined ? req.body.naziv.trim()  : z.naziv;
-  const opis          = req.body.opis          !== undefined ? req.body.opis          : z.opis;
-  const rok           = req.body.rok           !== undefined ? req.body.rok           : z.rok;
-  const zaduzenaOsoba = req.body.zaduzenaOsoba !== undefined ? req.body.zaduzenaOsoba : z.zaduzena_osoba;
-  const prioritet     = req.body.prioritet     !== undefined ? req.body.prioritet     : z.prioritet;
-  const status        = req.body.status        !== undefined ? req.body.status        : z.status;
-  db.prepare("UPDATE zadaci SET naziv = ?, opis = ?, rok = ?, zaduzena_osoba = ?, prioritet = ?, status = ? WHERE id = ?")
-    .run(naziv, opis, rok, zaduzenaOsoba, prioritet, status, z.id);
+  const naziv         = req.body.naziv         !== undefined ? req.body.naziv.trim()          : z.naziv;
+  const opis          = req.body.opis          !== undefined ? req.body.opis                   : z.opis;
+  const rok           = req.body.rok           !== undefined ? req.body.rok                    : z.rok;
+  const zaduzenaOsoba = req.body.zaduzenaOsoba !== undefined ? req.body.zaduzenaOsoba          : z.zaduzena_osoba;
+  const prioritet     = req.body.prioritet     !== undefined ? req.body.prioritet              : z.prioritet;
+  const status        = req.body.status        !== undefined ? req.body.status                 : z.status;
+  const procesniRok   = req.body.procesniRok   !== undefined ? (req.body.procesniRok ? 1 : 0) : z.procesni_rok;
+  db.prepare("UPDATE zadaci SET naziv = ?, opis = ?, rok = ?, zaduzena_osoba = ?, prioritet = ?, status = ?, procesni_rok = ? WHERE id = ?")
+    .run(naziv, opis, rok, zaduzenaOsoba, prioritet, status, procesniRok, z.id);
   res.json(rowToZadatak(db.prepare("SELECT * FROM zadaci WHERE id = ?").get(z.id)));
 });
 

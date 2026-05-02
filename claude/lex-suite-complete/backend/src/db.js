@@ -107,6 +107,7 @@ db.exec(`
     zaduzena_osoba  TEXT NOT NULL DEFAULT '',
     prioritet       TEXT NOT NULL DEFAULT 'srednji',
     status          TEXT NOT NULL DEFAULT 'nije_poceto',
+    procesni_rok    INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT NOT NULL
   );
 
