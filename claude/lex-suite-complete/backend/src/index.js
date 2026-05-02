@@ -10,6 +10,12 @@ import bcrypt from "bcrypt";
 import db from "./db.js";
 import { authMiddleware } from "./authMiddleware.js";
 
+// ── Debug: struktura foldera na Railwayu ───────────────────────────────────────
+console.log("CWD:", process.cwd());
+console.log("DIR:", import.meta.url);
+try { console.log("/app contents:", fs.readdirSync("/app")); } catch(e) {}
+try { console.log("CWD parent:", fs.readdirSync(join(process.cwd(), ".."))); } catch(e) {}
+
 const JWT_SECRET = "lexsuite-secret-2025";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
