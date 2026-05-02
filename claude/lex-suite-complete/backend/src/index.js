@@ -755,10 +755,8 @@ app.delete("/api/users/:id", requireAdmin, async (req, res) => {
 
 // ── Frontend (production build) ────────────────────────────────────────────────
 const FRONTEND_BUILD = join(__dirname, "../../frontend/build");
-if (fs.existsSync(FRONTEND_BUILD)) {
-  app.use(express.static(FRONTEND_BUILD));
-  app.get("*", (_req, res) => res.sendFile(join(FRONTEND_BUILD, "index.html")));
-}
+app.use(express.static(FRONTEND_BUILD));
+app.get("*", (_req, res) => res.sendFile(join(FRONTEND_BUILD, "index.html")));
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
