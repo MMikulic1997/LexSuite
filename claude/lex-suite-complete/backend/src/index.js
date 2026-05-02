@@ -10,12 +10,6 @@ import bcrypt from "bcrypt";
 import db from "./db.js";
 import { authMiddleware } from "./authMiddleware.js";
 
-// ── Debug: struktura foldera na Railwayu ───────────────────────────────────────
-console.log("CWD:", process.cwd());
-console.log("DIR:", import.meta.url);
-try { console.log("/app contents:", fs.readdirSync("/app")); } catch(e) {}
-try { console.log("CWD parent:", fs.readdirSync(join(process.cwd(), ".."))); } catch(e) {}
-
 const JWT_SECRET = "lexsuite-secret-2025";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -760,9 +754,9 @@ app.delete("/api/users/:id", requireAdmin, async (req, res) => {
 });
 
 // ── Frontend (production build) ────────────────────────────────────────────────
-const FRONTEND_BUILD = join(__dirname, "../../frontend/build");
+const FRONTEND_BUILD = join(process.cwd(), "public");
 app.use(express.static(FRONTEND_BUILD));
-app.get("*", (_req, res) => res.sendFile(join(FRONTEND_BUILD, "index.html")));
+app.get("*", (_req, res) => res.sendFile(join(process.cwd(), "public", "index.html")));
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
